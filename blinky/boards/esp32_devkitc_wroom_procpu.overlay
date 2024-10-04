@@ -7,7 +7,12 @@
 		};
 	};
 
+
 	aliases {
 		led0 = &myled0;
 	};
+};
+
+&wifi {
+	status = "okay";
 };

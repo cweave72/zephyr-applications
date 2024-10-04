@@ -8,6 +8,7 @@
 #include <zephyr/devicetree.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/drivers/gpio.h>
+#include "WifiConnect.h"
 
 /** @brief Initialize the logging module. */
 LOG_MODULE_REGISTER(app, LOG_LEVEL_DBG);
@@ -92,6 +93,9 @@ int main(void)
 
     LOG_INF("Sleeping 3 sec");
     k_msleep(3000);
+
+    WifiConnect_init();
+    WifiConnect_connect("shockwire", "threatlevelmidnight");
 
     while (1)
     {
