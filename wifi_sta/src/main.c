@@ -108,7 +108,7 @@ int main(void)
     k_thread_name_set(&thread, "led thread");
 
     WifiConnect_init();
-    WifiConnect_connect("<myssid>", "<mypwd>");
+    WifiConnect_connect("myssid", "mypass");
 
     while (1)
     {

@@ -14,6 +14,8 @@
 #include <spi_flash_mmap.h>
 #include <soc.h>
 
+#include "SwTimer.h"
+
 /** @brief Initialize the logging module. */
 LOG_MODULE_REGISTER(app, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -56,6 +58,18 @@ K_THREAD_DEFINE(led_thread, 1024, led_flash, NULL, NULL, NULL, 10, 0, 0);
 
 #define FLASH_PARTITION scratch_partition
 
+static void timer_cb(struct k_timer *t)
+{
+    static unsigned int count = 0;
+    printk("Hello %u\n", count++);
+}
+
+static SwTimer swt = {
+    .expire_cb = timer_cb,
+    .stop_cb = NULL,
+    .type = SWTIMER_TYPE_ONE_SHOT
+};
+
 int main(void)
 {
     uint8_t buffer[32];
@@ -83,6 +97,9 @@ int main(void)
     LOG_INF("memory-mapped pointer address: %p", mem_ptr);
     LOG_HEXDUMP_INF(mem_ptr, 32, "flash read using memory-mapped pointer");
 #endif
+
+    SwTimer_create(&swt);
+    SwTimer_start_ms(&swt, 5000);
 
     while (1)
     {
