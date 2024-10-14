@@ -11,8 +11,11 @@
 #include <zephyr/drivers/flash.h>
 #include <zephyr/storage/flash_map.h>
 
+#include <zephyr/settings/settings.h>
+
 #include <spi_flash_mmap.h>
 #include <soc.h>
+#include <errno.h>
 
 #include "SwTimer.h"
 
@@ -78,6 +81,7 @@ int main(void)
     spi_flash_mmap_handle_t handle;
     off_t address = FIXED_PARTITION_OFFSET(FLASH_PARTITION);
     size_t size = FIXED_PARTITION_SIZE(FLASH_PARTITION);
+    int rc;
 
     LOG_INF("Starting flash_access app.");
 
@@ -97,6 +101,12 @@ int main(void)
     LOG_INF("memory-mapped pointer address: %p", mem_ptr);
     LOG_HEXDUMP_INF(mem_ptr, 32, "flash read using memory-mapped pointer");
 #endif
+
+    rc = settings_subsys_init();
+    if (rc)
+    {
+        LOG_ERR("Settings error : %d", rc);
+    }
 
     SwTimer_create(&swt);
     SwTimer_start_ms(&swt, 5000);

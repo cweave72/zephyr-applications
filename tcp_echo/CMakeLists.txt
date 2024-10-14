@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.13.1)
 message("ZEPHYR_BASE = $ENV{ZEPHYR_BASE}")
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
-project(lfs_demo)
+project(tcp_echo)
 
 target_sources(app PRIVATE src/main.c)
 
