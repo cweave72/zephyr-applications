@@ -10,6 +10,7 @@
 #include <zephyr/drivers/gpio.h>
 #include "WifiConnect.h"
 #include "TcpEcho.h"
+#include "NvParms.h"
 
 /** @brief Initialize the logging module. */
 LOG_MODULE_REGISTER(app, LOG_LEVEL_DBG);
@@ -47,6 +48,35 @@ setup_gpio(void)
         LOG_ERR("gpio_pin_configure returned %d", ret);
         return -1;
     }
+    return 0;
+}
+
+static int
+init_wifi(void)
+{
+    char ssid[32];
+    char pass[32];
+    int ret, pass_len;
+
+    ret = NvParams_load("ssid", NVPARMS_TYPE_STRING, ssid, sizeof(ssid));
+    if (ret <= 0)
+    {
+        LOG_ERR("Error getting ssid from NV: %d", ret);
+        return -1;
+    }
+
+    pass_len = NvParams_load("pass", NVPARMS_TYPE_STRING, pass, sizeof(pass));
+    if (pass_len <= 0)
+    {
+        LOG_ERR("Error getting pass from NV: %d", pass_len);
+        return -1;
+    }
+
+    LOG_DBG("ssid=%s", ssid);
+    LOG_DBG("password length=%d", pass_len);
+
+    WifiConnect_init();
+    WifiConnect_connect(ssid, pass);
     return 0;
 }
 
@@ -110,8 +140,14 @@ int main(void)
         K_NO_WAIT);
     k_thread_name_set(&thread, "led thread");
 
-    WifiConnect_init();
-    WifiConnect_connect("shockwire", "threatlevelmidnight");
+    ret = NvParms_init();
+    if (ret < 0)
+    {
+        LOG_ERR("NvParms module init error : %d", ret);
+        return 0;
+    }
+
+    init_wifi();
 
     ret = TcpEcho_init(
         &tcp_echo,
