@@ -9,6 +9,8 @@
 #include <zephyr/usb/usb_device.h>
 #include <zephyr/net/net_config.h>
 
+#include <zephyr/net/net_if.h>
+#include <zephyr/net/dhcpv4_server.h>
 #include <zephyr/net/net_mgmt.h>
 #include <zephyr/net/net_event.h>
 #include <zephyr/net/conn_mgr_monitor.h>
@@ -25,18 +27,22 @@ static bool connected = false;
 
 static K_SEM_DEFINE(run_app, 0, 1);
 
+static struct in_addr my_ipv4_addr = { { { 10, 97, 0, 1 } } };
+static struct in_addr my_netmask = { { { 255, 255, 0, 0 } } };
+static struct in_addr my_gw = { { { 10, 97, 100, 1 } } };
+static struct in_addr pool_addr = { { { 10, 97, 100, 1 } } };
+
 static int
 init_usb(void)
 {
     int ret;
 
-    //ret = usb_enable(NULL);
-    //LOG_DBG("here1");
-    //if (ret != 0)
-    //{
-    //    LOG_ERR("Cannot enable USB (%d)", ret);
-    //    return ret;
-    //}
+    ret = usb_enable(NULL);
+    if (ret != 0)
+    {
+        LOG_ERR("Cannot enable USB (%d)", ret);
+        return ret;
+    }
 
     ret = net_config_init_app(NULL, "Initializing network");
     if (ret < 0)
@@ -46,6 +52,26 @@ init_usb(void)
     }
     return 0;
 }
+
+#if 0
+static void
+init_ip(void)
+{
+    struct net_if *iface = net_if_get_default();
+    struct net_if_addr *ifaddr;
+
+    ifaddr = net_if_ipv4_addr_add(iface, &my_ipv4_addr, NET_ADDR_MANUAL, 0);
+    if (!ifaddr)
+    {
+        LOG_ERR("Error setting IP address");
+        return;
+    }
+
+    net_if_ipv4_set_netmask(iface, &my_netmask);
+    net_if_ipv4_set_gw(iface, &my_gw);
+    net_dhcpv4_server_start(iface, &pool_addr);
+}
+#endif
 
 static void
 event_handler(
@@ -121,17 +147,10 @@ int main(void)
     k_sem_take(&run_app, K_FOREVER);
     LOG_DBG("Took sem.");
 
+    //init_ip();
+
     while (1)
     {
-        if (connected)
-        {
-            LOG_INF("Connected");
-        }
-        else
-        {
-            LOG_INF("Not connected");
-            
-        }
         k_msleep(1000);
     }
 

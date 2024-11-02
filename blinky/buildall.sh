@@ -13,6 +13,7 @@ Examples:
     $0 --cmd=build --board=esp32_devkitc_wroom
     $0 --cmd=flash
     $0 --cmd=mon  (runs espressif monitor, if esp32)
+    $0 --cmd=stmon  (runs st monitor, if stm32)
     $0 --cmd=flashmon  (runs flash then espressif monitor, if esp32)
     $0 --cmd=<westcmd> [westcmd opts]
     $0 --cmd=manifest --path
@@ -82,6 +83,13 @@ done
 
 if [[ $cmd == "mon" ]]; then
     cmd="espressif monitor"
+    cmdline="west $cmd $cleanbuild $board "${leftoverargs[@]}""
+    $cmdline
+    exit 0
+fi
+
+if [[ $cmd == "stmon" ]]; then
+    cmd="stm32 monitor"
     cmdline="west $cmd $cleanbuild $board "${leftoverargs[@]}""
     $cmdline
     exit 0
