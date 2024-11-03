@@ -53,13 +53,20 @@ sudo udevadm trigger
 ```yaml
 network:
   version: 2
-  renderer: NetworkManager
+  renderer: networkd
   ethernets:
+    en1ps0:
+      dhcp4: true
+    # New below:
     usb_zeph:
       dhcp4: false
       addresses:
         - 192.0.2.2/24
 ```
+
+Note: Using NetworkManager as the renderer causes network problems when the
+usb network is connected.  Switching over to networkd as the renderer seems to
+fix this.
 
 * Then:
 
