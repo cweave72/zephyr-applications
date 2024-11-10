@@ -98,14 +98,14 @@ init_wifi(void)
     char pass[32];
     int ret, pass_len;
 
-    ret = NvParams_load("ssid", NVPARMS_TYPE_STRING, ssid, sizeof(ssid));
+    ret = NvParms_load("ssid", NVPARMS_TYPE_STRING, ssid, sizeof(ssid));
     if (ret <= 0)
     {
         LOG_ERR("Error getting ssid from NV: %d", ret);
         return -1;
     }
 
-    pass_len = NvParams_load("pass", NVPARMS_TYPE_STRING, pass, sizeof(pass));
+    pass_len = NvParms_load("pass", NVPARMS_TYPE_STRING, pass, sizeof(pass));
     if (pass_len <= 0)
     {
         LOG_ERR("Error getting pass from NV: %d", pass_len);
