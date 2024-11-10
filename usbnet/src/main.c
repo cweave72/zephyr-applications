@@ -121,13 +121,15 @@ init_app(void)
 {
     int ret;
 
-    if (IS_ENABLED(CONFIG_NET_CONNECTION_MANAGER))
+    if (!IS_ENABLED(CONFIG_NET_CONNECTION_MANAGER))
     {
-        LOG_DBG("Net Connection Manager enabled.");
-        net_mgmt_init_event_callback(&mgmt_cb, event_handler, EVENT_MASK);
-        net_mgmt_add_event_callback(&mgmt_cb);
-        conn_mgr_mon_resend_status();
+        LOG_ERR("Must set CONFIG_NET_CONNECTION_MANAGER=y in Kconfig.");
+        return -1;
     }
+
+    net_mgmt_init_event_callback(&mgmt_cb, event_handler, EVENT_MASK);
+    net_mgmt_add_event_callback(&mgmt_cb);
+    conn_mgr_mon_resend_status();
 
     init_usb();
 
