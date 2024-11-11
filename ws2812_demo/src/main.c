@@ -3,10 +3,9 @@
 #include <zephyr/devicetree.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/drivers/gpio.h>
-
 #include <zephyr/drivers/led_strip.h>
-#include <zephyr/drivers/spi.h>
-#include <zephyr/sys/util.h>
+
+#include "WS2812Led.h"
 
 /** @brief Initialize the logging module. */
 LOG_MODULE_REGISTER(app, LOG_LEVEL_DBG);
@@ -19,56 +18,132 @@ LOG_MODULE_REGISTER(app, LOG_LEVEL_DBG);
 #error Unable to determine length of LED strip
 #endif
 
-#define DELAY_TIME K_MSEC(50)
+#define NUM_PIXELS  DT_PROP(STRIP_NODE, chain_length)
+static const struct device *const dev = DEVICE_DT_GET(STRIP_NODE);
 
-#define RGB(_r, _g, _b) { .r = (_r), .g = (_g), .b = (_b) }
-
-static const struct led_rgb colors[] = {
-        RGB(0x0f, 0x00, 0x00), /* red */
-        RGB(0x00, 0x0f, 0x00), /* green */
-        RGB(0x00, 0x00, 0x0f), /* blue */
+WS2812Led_Strip led_strip = {
+    .numPixels = NUM_PIXELS,
+    .loopDelay_ms = 10,
+    .taskStackSize = 4*1024,
+    .taskName = "Led0",
+    .taskPrio = 15
 };
 
-static struct led_rgb pixels[STRIP_NUM_PIXELS];
-
-static const struct device *const strip = DEVICE_DT_GET(STRIP_NODE);
-
+WS2812Led_Segment segment0 = {
+    .startIdx = 0,
+    .endIdx = NUM_PIXELS-1,
+    .taskName = "seg0",
+    .taskStackSize = 2*1024,
+    .taskPrio = 10,
+    .loopDelay_ms = 10
+};
 
 int main(void)
 {
+
     LOG_INF("Starting ws2812 demo app.");
 
-    size_t color = 0;
-    int rc;
+    /* Use core 1 to mitigate preemption from wifi task. */
+    WS2812Led_init(dev, &led_strip, 1);
+    WS2812Led_addSegment(&led_strip, &segment0);
 
-    if (device_is_ready(strip))
-    {
-        LOG_INF("Found LED strip device %s", strip->name);
-    } else
-    {
-        LOG_ERR("LED strip device %s is not ready", strip->name);
-        return 0;
-    }
+    segment0.off(&segment0);
+    WS2812Led_show(&led_strip);
 
-    LOG_INF("Displaying pattern on strip");
     while (1)
     {
-        for (size_t cursor = 0; cursor < ARRAY_SIZE(pixels); cursor++)
+        int i, j;
+        CHSV start, end, color;
+
+#if 0
+        LOG_INF("Fire");
+        segment0.fire(&segment0, true, 120, 100, 10);
+        RTOS_TASK_SLEEP_s(20);
+#endif
+
+#if 1
+        LOG_INF("Dissolve");
+        color = WS2812LED_COLOR(HUE_AQUA, 255, 140);
+        segment0.dissolve(&segment0, true, &color, 80, 20, 50);
+        RTOS_TASK_SLEEP_s(20);
+#endif
+
+#if 0
+        LOG_INF("Meteor");
+        color = WS2812LED_COLOR(HUE_BLUE, 255, 240);
+        segment0.meteor(&segment0, true, &color, 1, 80, true, 20);
+        RTOS_TASK_SLEEP_s(20);
+#endif
+
+#if 1
+        LOG_INF("Sparkle");
+        color = WS2812LED_COLOR(HUE_BLUE, 255, 140);
+        segment0.sparkle(&segment0, true, &color, 1, 10);
+        RTOS_TASK_SLEEP_s(10);
+#endif
+
+#if 0
+        LOG_INF("Twinkle");
+        segment0.twinkle(&segment0, true, 50, 10);
+        RTOS_TASK_SLEEP_s(10);
+#endif
+
+#if 1
+        LOG_INF("Fill random");
+        for (i = 0; i < 100; i++)
         {
-            memset(&pixels, 0x00, sizeof(pixels));
-            memcpy(&pixels[cursor], &colors[color], sizeof(struct led_rgb));
+            segment0.fill_random(&segment0, 255, 50);
+            RTOS_TASK_SLEEP_ms(100);
+        }
+#endif
 
-            rc = led_strip_update_rgb(strip, pixels, STRIP_NUM_PIXELS);
-            if (rc)
+#if 1
+        LOG_INF("Fill rainbow");
+        for (i = 0; i < 1000; i++)
+        {
+            segment0.fill_rainbow(&segment0, i, 255, 70);
+            RTOS_TASK_SLEEP_ms(10);
+        }
+#endif
+
+#if 0
+        LOG_INF("Fill solid");
+        for (j = 0; j < 255; j+=10)
+        {
+            for (i = 0; i < 200; i++)
             {
-                LOG_ERR("couldn't update strip: %d", rc);
-            }
+                uint8_t v;
+                if (i < 100)
+                {
+                    v = i;
+                }
+                else
+                {
+                    v = 200 - i;
+                }
 
-            k_sleep(DELAY_TIME);
+                start = (CHSV){ .h = j, .s = 255, .v = v };
+                segment0.fill_solid(&segment0, &start);
+                RTOS_TASK_SLEEP_ms(10);
+            }
         }
 
-        color = (color + 1) % ARRAY_SIZE(colors);
+#endif
+
+#if 1
+        LOG_INF("Blend");
+        start = (CHSV){ .h = HUE_BLUE, .s = 255, .v = 80 };
+        end = (CHSV){ .h = HUE_BLUE-1, .s = 255, .v = 80 };
+        segment0.blend(&segment0,
+                       true,
+                       &start,
+                       &end,
+                       GRAD_LONGEST,
+                       800,
+                       20);
+
+        RTOS_TASK_SLEEP_s(15);
+#endif
     }
 
-    return 0;
 }
