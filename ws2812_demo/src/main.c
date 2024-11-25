@@ -12,6 +12,10 @@ LOG_MODULE_REGISTER(app, LOG_LEVEL_DBG);
 
 #define STRIP_NODE              DT_ALIAS(led_strip)
 
+#ifdef CONFIG_LED_POWER
+static const struct gpio_dt_spec ledpwr = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
+#endif
+
 #if DT_NODE_HAS_PROP(DT_ALIAS(led_strip), chain_length)
 #define STRIP_NUM_PIXELS        DT_PROP(DT_ALIAS(led_strip), chain_length)
 #else
@@ -40,11 +44,24 @@ WS2812Led_Segment segment0 = {
 
 int main(void)
 {
+    int ret;
 
     LOG_INF("Starting ws2812 demo app.");
 
+#ifdef CONFIG_LED_POWER
+    LOG_INF("Applying Led power GPIO.");
+    /* Provide power to RGB led. */
+    if (!gpio_is_ready_dt(&ledpwr))
+    {
+        LOG_ERR("GPIO device is not ready.");        
+    }
+    /* Enable RGB LED */
+    gpio_pin_configure_dt(&ledpwr, GPIO_OUTPUT_ACTIVE);
+#endif
+
     /* Use core 1 to mitigate preemption from wifi task. */
-    WS2812Led_init(dev, &led_strip, 1);
+    ret = WS2812Led_init(dev, &led_strip, 1);
+
     WS2812Led_addSegment(&led_strip, &segment0);
 
     segment0.off(&segment0);

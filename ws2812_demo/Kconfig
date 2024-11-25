@@ -1,0 +1,7 @@
+mainmenu "WS2812 demo application"
+
+config LED_POWER
+    bool "Uses a pin to supply power to the WS2812 LED."
+    default n
+
+source "Kconfig.zephyr"
