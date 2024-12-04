@@ -1,2 +1,6 @@
+*.lock
 **/build/
+**/.venv/
+**/*.egg-info
+**/__pycache__
 *.log
