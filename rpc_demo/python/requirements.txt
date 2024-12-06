@@ -1,5 +1,4 @@
-#-e ${TOOLS_PATH}/api_generator/
--e ${TOOLS_PATH}/protorpc/
+-e ${TOOLS_BASE}/protorpc/
 -e .
 
 protobuf

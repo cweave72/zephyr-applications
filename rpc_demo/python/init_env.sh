@@ -1,9 +1,8 @@
 #!/bin/bash
 
-(return 0 2>/dev/null)
-if [ $? -eq 1 ]; then
-    echo "Error: Script must be sourced."
-    exit
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+	echo "Error: script must be sourced."
+	exit
 fi
 
 function activate_env {
@@ -13,8 +12,10 @@ function activate_env {
     fi
 }
 
-workspace=$HOME/zephyr-workspace
-export TOOLS_PATH=$workspace/common/tools
+if [ -z "$TOOLS_BASE" ]; then
+    echo "Error: TOOLS_BASE variable is not set. Must initialize the workspace first."
+    return
+fi
 
 PY3=python3.10
 PROMPT=venv
