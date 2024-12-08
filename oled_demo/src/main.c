@@ -4,15 +4,21 @@
 #include <zephyr/devicetree.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/display/cfb.h>
+#include <zephyr/drivers/sensor.h>
+#include <zephyr/drivers/sensor/sht4x.h>
 
 #include "RtosUtils.h"
-#include "SwTimer.h"
 
 /** @brief Initialize the logging module. */
 LOG_MODULE_REGISTER(app, LOG_LEVEL_DBG);
 
 #define DISPLAY_DRIVER   DT_CHOSEN(zephyr_display)
-static const struct device *const dev = DEVICE_DT_GET(DISPLAY_DRIVER);
+#define TEMP_HUM_SENSOR  DT_ALIAS(temphum0)
+#define STRIP_NODE       DT_ALIAS(led_strip)
+
+static const struct device *const display_dev = DEVICE_DT_GET(DISPLAY_DRIVER);
+static const struct device *const temp_hum_dev = DEVICE_DT_GET(TEMP_HUM_SENSOR);
+static const struct device *const rgbled_dev = DEVICE_DT_GET(STRIP_NODE);
 
 #define FONT_INDEX  4
 
@@ -25,6 +31,56 @@ static struct params {
     uint8_t font_width;
     uint8_t font_height;
 } params;
+
+static int
+init_sensor(const struct device *dev)
+{
+    if (!device_is_ready(dev))
+    {
+        LOG_ERR("Temp sensor is not ready.");
+        return -1;
+    }
+    return 0;
+}
+
+static void
+get_temp_hum(
+    const struct device *dev,
+    struct sensor_value *temp,
+    struct sensor_value *hum)
+{
+    if (sensor_sample_fetch(dev))
+    {
+        LOG_ERR("Failed to fetch sensor data.");
+        return;
+    }
+
+    sensor_channel_get(dev, SENSOR_CHAN_AMBIENT_TEMP, temp);
+    sensor_channel_get(dev, SENSOR_CHAN_HUMIDITY, hum);
+}
+
+static void
+update_display(
+    const struct device *display,
+    const struct sensor_value *temp,
+    const struct sensor_value *hum)
+{
+    double deg_c = temp->val1 + (double)(temp->val2)*0.000001;
+    double deg_f = deg_c*9/5 + 32.;
+    double hum_pct = hum->val1 + (double)(hum->val2)*0.000001;
+    char str[12];
+
+    LOG_INF("Temperature: %d %d", temp->val1, temp->val2);
+    LOG_INF("Humidity   : %d %d", hum->val1, hum->val2);
+    LOG_INF("Temperature: %.1lf", deg_f);
+    LOG_INF("Humidity   : %.1lf", hum_pct);
+
+    snprintf(str, sizeof(str), "Tmp: %d", (unsigned int)(deg_f + 0.5));
+    cfb_print(display, str, 0, 0);
+    snprintf(str, sizeof(str), "Hum: %u", hum->val1);
+    cfb_print(display, str, 0, 8);
+    cfb_framebuffer_finalize(display_dev);
+}
 
 static int
 init_display(const struct device *dev, struct params *p)
@@ -82,23 +138,22 @@ init_display(const struct device *dev, struct params *p)
 
 int main(void)
 {
-    SwTimer timer;
-    uint32_t k = 0;
-    uint32_t delta = 0;
-    init_display(dev, &params);
+    int sensor_ready;
+    struct sensor_value temp;
+    struct sensor_value hum;
+
+    sensor_ready = init_sensor(temp_hum_dev);
+
+    init_display(display_dev, &params);
 
     while (1)
     {
-        char str[9];
+        RTOS_TASK_SLEEP_ms(1000);
 
-        SwTimer_tic(&timer);
-        snprintf(str, sizeof(str), "%u", k++);
-        cfb_print(dev, str, 0, 0);
-        snprintf(str, sizeof(str), "%u us", delta);
-        cfb_print(dev, str, 0, 8);
-        cfb_framebuffer_finalize(dev);
-        delta = SwTimer_toc(&timer);
-
-        RTOS_TASK_SLEEP_ms(100);
+        if (sensor_ready == 0)
+        {
+            get_temp_hum(temp_hum_dev, &temp, &hum);
+            update_display(display_dev, &temp, &hum);
+        }
     }
 }
