@@ -5,12 +5,12 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/display/cfb.h>
 #include <zephyr/drivers/sensor.h>
-#include <zephyr/drivers/sensor/sht4x.h>
 
+#include "WS2812Led.h"
 #include "RtosUtils.h"
 
 /** @brief Initialize the logging module. */
-LOG_MODULE_REGISTER(app, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(app, LOG_LEVEL_INF);
 
 #define DISPLAY_DRIVER   DT_CHOSEN(zephyr_display)
 #define TEMP_HUM_SENSOR  DT_ALIAS(temphum0)
@@ -31,6 +31,8 @@ static struct params {
     uint8_t font_width;
     uint8_t font_height;
 } params;
+
+static WS2812Led led;
 
 static int
 init_sensor(const struct device *dev)
@@ -70,10 +72,8 @@ update_display(
     double hum_pct = hum->val1 + (double)(hum->val2)*0.000001;
     char str[12];
 
-    LOG_INF("Temperature: %d %d", temp->val1, temp->val2);
-    LOG_INF("Humidity   : %d %d", hum->val1, hum->val2);
-    LOG_INF("Temperature: %.1lf", deg_f);
-    LOG_INF("Humidity   : %.1lf", hum_pct);
+    LOG_DBG("Temperature: %d %d", temp->val1, temp->val2);
+    LOG_DBG("Humidity   : %d %d", hum->val1, hum->val2);
 
     snprintf(str, sizeof(str), "Tmp: %d", (unsigned int)(deg_f + 0.5));
     cfb_print(display, str, 0, 0);
@@ -136,15 +136,25 @@ init_display(const struct device *dev, struct params *p)
     return 0;
 }
 
+
 int main(void)
 {
     int sensor_ready;
     struct sensor_value temp;
     struct sensor_value hum;
+    WS2812Led_Segment *led_seg = &led.seg;
 
     sensor_ready = init_sensor(temp_hum_dev);
 
     init_display(display_dev, &params);
+
+    WS2812LED_INIT_SIMPLE(rgbled_dev, &led, "led", 1);
+
+    /* Start blend around the color wheel. */
+    CHSV color1 = WS2812LED_HSV_COLOR(HUE_GREEN, 255, 100);
+    CHSV color2 = WS2812LED_HSV_COLOR(color1.h + 255, 255, 100);
+    led_seg->show(led_seg);
+    led_seg->blend(led_seg, true, &color1, &color2, GRAD_LONGEST, 200, 50);
 
     while (1)
     {
