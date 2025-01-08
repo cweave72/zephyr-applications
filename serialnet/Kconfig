@@ -1,0 +1,18 @@
+mainmenu "serialnet demo application"
+
+menu "App Options"
+	config APP_IPV4_ADDR
+	    string "IP address for the serial interface."
+	    default "192.0.2.1"
+
+	config APP_IPV4_MASK
+	    string "IP netmask for the serial interface."
+	    default "255.255.255.0"
+
+	config APP_IPV4_GW
+	    string "IP gateway for the serial interface."
+	    default "192.0.2.2"
+endmenu
+
+source "Kconfig.zephyr"
+
