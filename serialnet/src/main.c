@@ -35,7 +35,7 @@ init_ip(void)
 
     iface = net_if_get_default();
 
-    LOG_INF("Setting IP address for iface %s:", IFACE_NAME);
+    LOG_INF("Setting IP address for iface:");
     LOG_INF("  addr: %s", CONFIG_APP_IPV4_ADDR);
     LOG_INF("  mask: %s", CONFIG_APP_IPV4_MASK);
     LOG_INF("  gw  : %s", CONFIG_APP_IPV4_GW);
