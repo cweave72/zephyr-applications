@@ -15,8 +15,8 @@ in the custom driver `eth_serial`.
 The `serialnet` app uses the `eth_serial` driver, which can be configured to use
 one of the following framing methods:
 
-* SLIP (serial-line interface protocol) (see [slip](https://github.com/cweave72/zephyr-common/modules/slip))
-* COBS (consistent overhead byte stuffing) (see [cobs](https;//github.com/cweave72/zephyr-common/modules/Cobs)
+* SLIP (serial-line interface protocol) (see [slip](https://github.com/cweave72/zephyr-common/tree/main/modules/slip)
+* COBS (consistent overhead byte stuffing) (see [cobs](https;//github.com/cweave72/zephyr-common/tree/main/modules/Cobs)
 
 To us SLIP (in `proj.conf`):
 ```
