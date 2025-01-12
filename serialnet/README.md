@@ -10,6 +10,24 @@ in the custom driver `eth_serial`.
 
 * `taptool` see [tuntap-serial](https://github.com/cweave72/tuntap-serial) 
 
+## Configuration
+
+The `serialnet` app uses the `eth_serial` driver, which can be configured to use
+one of the following framing methods:
+
+* SLIP (serial-line interface protocol) (see [slip](https://github.com/cweave72/zephyr-common/modules/slip))
+* COBS (consistent overhead byte stuffing) (see [cobs](https;//github.com/cweave72/zephyr-common/modules/Cobs)
+
+To us SLIP (in `proj.conf`):
+```
+CONFIG_ETH_SERIAL_SLIP=y
+```
+
+To us COBS:
+```
+CONFIG_ETH_SERIAL_COBS=y
+```
+
 ## Build and Flash
 
 Build
@@ -33,10 +51,11 @@ make mon ARGS="-p /dev/ttyUSB0"
 
 The build defaults to using an IP of `192.0.2.1`.
 
-Run `taptool` (from wherever tuntap-serial.git was cloned):
+Run `taptool` (from wherever tuntap-serial.git was cloned, use option for
+framing method chosen):
 ```
 . .venv/bin/activate
-(in venv) sudo .venv/bin/taptool -d tap --tty /dev/ttyUSB1 --ip 192.0.2.2
+(in venv) sudo .venv/bin/taptool -d tap --tty /dev/ttyUSB1 --ip 192.0.2.2 [--slip | --cobs]
 ```
 
 Interface `tap0` should be active.
