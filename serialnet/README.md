@@ -15,8 +15,8 @@ in the custom driver `eth_serial`.
 The `serialnet` app uses the `eth_serial` driver, which can be configured to use
 one of the following framing methods:
 
-* SLIP (serial-line interface protocol) (see [slip](https://github.com/cweave72/zephyr-common/tree/main/modules/slip)
-* COBS (consistent overhead byte stuffing) (see [cobs](https;//github.com/cweave72/zephyr-common/tree/main/modules/Cobs)
+* SLIP (serial-line interface protocol) [slip](https://github.com/cweave72/zephyr-common/tree/main/modules/slip)
+* COBS (consistent overhead byte stuffing) [cobs](https;//github.com/cweave72/zephyr-common/tree/main/modules/Cobs)
 
 To us SLIP (in `proj.conf`):
 ```
@@ -46,6 +46,51 @@ Flash and monitor:
 make flash ARGS="--esp-device /dev/ttyUSB0"
 make mon ARGS="-p /dev/ttyUSB0"
 ```
+
+## Running in QEMU
+
+This will allow running the application under QEMU and provide networking with
+the host linux PC.
+
+* We must first set up an emulated serial device and listening socket using a
+`socat` command. This is accomplished via the script `loop-socat.sh` which is
+found either at `deps/tools/net-tools` or wherever you cloned `tuntap-serial`
+mentioned above.
+```
+sudo ./loop-socat.sh
+```
+
+This will create a psuedo terminal and link it to the file `/tmp/slip.dev` which
+is expected by QEMU. For reference, the socat command is shown below:
+```
+socat PTY,link=/tmp/slip.dev UNIX-LISTEN:/tmp/slip.sock
+```
+
+This command creates a virtual serial port (`/tmp/slip.dev`) and establishes a
+Unix socket connection at `/tmp/slip.sock`.
+
+* Build and run the app in `qemu_x86`:
+```
+make build BOARD=qemu_x86
+sudo make west ARGS="build -t run"
+```
+
+If you see the following error message, you forgot to run the `loop-socat.sh`
+script before running.
+```
+qemu-system-i386: -serial unix:/tmp/slip.sock: Failed to connect to '/tmp/slip.sock': No such file or directory
+qemu-system-i386: -serial unix:/tmp/slip.sock: could not connect serial device to character backend 'unix:/tmp/slip.sock'
+```
+
+* Finally, start the `taptool` utility as follows (the `-d` is optional):
+```
+sudo .venv/bin/taptool -d tap --tty /tmp/slip.dev --ip 192.0.2.2 --slip
+```
+
+>**Note**: Notice that running the `loop-socat.sh` script and running the app
+>with qemu must be as `sudo`.
+
+* The target app and network are now ready for testing.
 
 ## Testing
 
