@@ -7,6 +7,7 @@ target_sources(
     app
     PRIVATE
     src/main.c
+    src/sensor.c
     src/font5x7.c
     src/font8x8.c
     )

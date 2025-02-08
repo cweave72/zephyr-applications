@@ -88,7 +88,7 @@ sudo .venv/bin/taptool -d tap --tty /tmp/slip.dev --ip 192.0.2.2 --slip
 ```
 
 >**Note**: Notice that running the `loop-socat.sh` script and running the app
->with qemu must be as `sudo`.
+>with qemu must be as `sudo`. Steps above must be run in the order listed.
 
 * The target app and network are now ready for testing.
 

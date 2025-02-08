@@ -52,3 +52,7 @@
 		repeatability = <2>;
 	};
 };
+
+&wifi {
+	status = "okay";
+};

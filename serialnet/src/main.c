@@ -1,13 +1,9 @@
 #include <stdbool.h>
 
 #include <zephyr/kernel.h>
-#include <zephyr/device.h>
-#include <zephyr/devicetree.h>
 #include <zephyr/logging/log.h>
-#include <zephyr/drivers/gpio.h>
 #include <zephyr/net/net_config.h>
 #include <zephyr/net/net_if.h>
-#include <zephyr/net/dhcpv4_server.h>
 #include <zephyr/net/net_mgmt.h>
 #include <zephyr/net/net_event.h>
 #include <zephyr/net/conn_mgr_monitor.h>
@@ -22,7 +18,7 @@ LOG_MODULE_REGISTER(app, LOG_LEVEL_DBG);
 static struct net_mgmt_event_callback mgmt_cb;
 static bool connected = false;
 
-static K_SEM_DEFINE(run_app, 0, 1);
+static K_SEM_DEFINE(l4_connected, 0, 1);
 
 static void
 init_ip(void)
@@ -56,7 +52,7 @@ init_ip(void)
 }
 
 static void
-event_handler(
+l4_event_handler(
     struct net_mgmt_event_callback *cb,
     uint32_t mgmt_event,
     struct net_if *iface)
@@ -72,7 +68,7 @@ event_handler(
     case NET_EVENT_L4_CONNECTED:
         LOG_DBG("NET_EVENT_L4_CONNECTED");
         connected = true;
-        k_sem_give(&run_app);
+        k_sem_give(&l4_connected);
         break;
     case NET_EVENT_L4_DISCONNECTED:
         LOG_DBG("NET_EVENT_L4_DISCONNECTED");
@@ -82,7 +78,7 @@ event_handler(
             connected = false;
         }
         LOG_DBG("Resetting sem.");
-        k_sem_reset(&run_app);
+        k_sem_reset(&l4_connected);
         break;
     case NET_EVENT_L4_IPV4_CONNECTED:
         LOG_DBG("NET_EVENT_L4_IPV4_CONNECTED");
@@ -104,7 +100,7 @@ event_handler(
 }
 
 static int
-init_app(void)
+network_init(void)
 {
     int ret;
 
@@ -114,7 +110,7 @@ init_app(void)
         return -1;
     }
 
-    net_mgmt_init_event_callback(&mgmt_cb, event_handler, EVENT_MASK);
+    net_mgmt_init_event_callback(&mgmt_cb, l4_event_handler, EVENT_MASK);
     net_mgmt_add_event_callback(&mgmt_cb);
     conn_mgr_mon_resend_status();
 
@@ -127,7 +123,14 @@ init_app(void)
         return ret;
     }
 
-    return ret;
+    LOG_INF("Waiting for network connection...");
+
+    /* Wait for the connection. */
+    k_sem_take(&l4_connected, K_FOREVER);
+
+    LOG_INF("Network connected.");
+
+    return 0;
 }
 
 int main(void)
@@ -137,14 +140,7 @@ int main(void)
     LOG_INF("CONFIG_NET_BUF_RX_COUNT=%u", CONFIG_NET_BUF_RX_COUNT);
     LOG_INF("CONFIG_NET_TCP_MAX_RECV_WINDOW_SIZE=%u", CONFIG_NET_TCP_MAX_RECV_WINDOW_SIZE);
 
-    init_app();
-
-    LOG_DBG("Waiting on connection sem.");
-
-    /* Wait for the connection. */
-    k_sem_take(&run_app, K_FOREVER);
-    LOG_DBG("Got connection sem.");
-
+    network_init();
 
     while (1)
     {
