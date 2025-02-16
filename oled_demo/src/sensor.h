@@ -15,4 +15,10 @@ void get_temp_hum(struct sensor_value *temp, struct sensor_value *hum);
 int init_display(void);
 void update_display(const struct sensor_value *temp, const struct sensor_value *hum);
 
+int
+encode_json_result(
+    const struct sensor_value *temp,
+    const struct sensor_value *hum,
+    char *buffer,
+    uint32_t max_size);
 #endif

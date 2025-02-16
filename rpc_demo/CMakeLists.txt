@@ -3,7 +3,7 @@ message("ZEPHYR_BASE = $ENV{ZEPHYR_BASE}")
 message("ZEPHYR_SDK_INSTALL_DIR = $ENV{ZEPHYR_SDK_INSTALL_DIR}")
 message("ZEPHYR_TOOLCHAIN_VARIANT = $ENV{ZEPHYR_TOOLCHAIN_VARIANT}")
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
-project(tcp_echo)
+project(rpc_demo)
 
 target_sources(app PRIVATE src/main.c)
 

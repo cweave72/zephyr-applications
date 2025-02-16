@@ -3,6 +3,8 @@
  *  
  *  @brief: Code for reading sensor data
 *******************************************************************************/
+#include <zephyr/data/json.h>
+#include "lwm2m_util.h"
 #include "sensor.h"
 
 #include <zephyr/logging/log.h>
@@ -25,6 +27,31 @@ static struct dparams {
 } dparams;
 
 #define FONT_INDEX  4
+
+struct sensor_result {
+    struct json_obj_token temp;
+    struct json_obj_token hum;
+};
+
+static const struct json_obj_descr json_result[] = {
+    JSON_OBJ_DESCR_PRIM(struct sensor_result, temp, JSON_TOK_FLOAT),
+    JSON_OBJ_DESCR_PRIM(struct sensor_result, hum, JSON_TOK_FLOAT),
+};
+
+static int
+float_to_string(double *value, char *out, uint32_t outlen, uint8_t num_precision)
+{
+    int len;
+
+    len = lwm2m_ftoa(value, out, outlen, num_precision);
+    if (len < 0 || len >= outlen)
+    {
+        LOG_ERR("Failed to encode float value");
+        return -EINVAL;
+    }
+
+    return len;
+}
 
 int
 init_sensor(void)
@@ -55,7 +82,6 @@ update_display(const struct sensor_value *temp, const struct sensor_value *hum)
 {
     double deg_c = temp->val1 + (double)(temp->val2)*0.000001;
     double deg_f = deg_c*9/5 + 32.;
-    double hum_pct = hum->val1 + (double)(hum->val2)*0.000001;
     char str[12];
 
     LOG_DBG("Temperature: %d %d", temp->val1, temp->val2);
@@ -66,6 +92,66 @@ update_display(const struct sensor_value *temp, const struct sensor_value *hum)
     snprintf(str, sizeof(str), "Hum: %u", hum->val1);
     cfb_print(display_dev, str, 0, 8);
     cfb_framebuffer_finalize(display_dev);
+}
+
+int
+encode_json_result(
+    const struct sensor_value *temp,
+    const struct sensor_value *hum,
+    char *buffer,
+    uint32_t max_size)
+{
+    int ret;
+    double deg_c = temp->val1 + (double)(temp->val2)*0.000001;
+    double deg_f = deg_c*9/5 + 32.;
+    double hum_pct = hum->val1 + (double)(hum->val2)*0.000001;
+    char temp_fl[24];
+    char hum_fl[24];
+    int fllen;
+
+    struct sensor_result rs;
+
+    fllen = float_to_string(&deg_f, temp_fl, sizeof(temp_fl), 2);
+    if (fllen < 0)
+    {
+        return -1;
+    }
+    rs.temp.start = temp_fl;
+    rs.temp.length = fllen;
+
+    fllen = float_to_string(&hum_pct, hum_fl, sizeof(hum_fl), 2);
+    if (fllen < 0)
+    {
+        return -1;
+    }
+    rs.hum.start = hum_fl;
+    rs.hum.length = fllen;
+
+    int len = json_calc_encoded_len(
+        json_result, ARRAY_SIZE(json_result), &rs);
+
+    if (len < 0)
+    {
+        LOG_ERR("Error json_calc_encoded_len: %d", len);
+        return (int)len;
+    }
+
+    if (len > max_size)
+    {
+        LOG_ERR("Buffer not large enough to encode json (%u > %u).",
+            len, max_size);
+        return -EINVAL;
+    }
+
+    ret = json_obj_encode_buf(json_result, ARRAY_SIZE(json_result),
+        &rs, buffer, max_size);
+    if (ret < 0)
+    {
+        LOG_ERR("Json encode error: %d", ret);
+        return ret;
+    }
+
+    return len;
 }
 
 int

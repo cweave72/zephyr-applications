@@ -89,28 +89,27 @@ int main(void)
     ret = MqttClient_init(&mqtt, "zephyr_test");
     if (ret == 0)
     {
-        MqttClient_setTopic(&mqtt_topic, "room/temp", MQTT_QOS_0_AT_MOST_ONCE);
+        MqttClient_setTopic(&mqtt_topic, "room/temp_hum", MQTT_QOS_0_AT_MOST_ONCE);
     }
 
     while (1)
     {
         uint8_t pay[20];
+        char json_buffer[64];
 
         RTOS_TASK_SLEEP_ms(5000);
 
         if (sensor_ready == 0)
         {
-            double deg_c;
-            double deg_f;
-
             get_temp_hum(&temp, &hum);
             update_display(&temp, &hum);
 
-            deg_c = temp.val1 + (double)(temp.val2)*0.000001;
-            deg_f = deg_c*9/5 + 32.;
-
-            sprintf(pay, "%d", (unsigned int)(deg_f + 0.5));
-            MqttClient_publish(&mqtt, &mqtt_topic, pay, strlen(pay));
+            int len = encode_json_result(
+                &temp, &hum, json_buffer, sizeof(json_buffer));
+            if (len > 0)
+            {
+                MqttClient_publish(&mqtt, &mqtt_topic, json_buffer, len);
+            }
         }
     }
 }
