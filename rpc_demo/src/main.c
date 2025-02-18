@@ -16,11 +16,14 @@ LOG_MODULE_REGISTER(app, LOG_LEVEL_DBG);
 /** @brief RPC Declarations */
 #include "TestRpc.h"
 #include "TestRpc.pb.h"
+#include "SystemRpc.h"
+#include "SystemRpc.pb.h"
 
 #define RPCSERVER_STACK_SIZE    4*1024
 
 static ProtoRpc_Callset_Entry callsets[] = {
     PROTORPC_ADD_CALLSET(1, TestRpc_resolver, test_TestCallset_fields, test_TestCallset_size),
+    PROTORPC_ADD_CALLSET(2, SystemRpc_resolver, system_SystemCallset_fields, system_SystemCallset_size),
 };
 
 static TcpRpcServer tcp_rpc;

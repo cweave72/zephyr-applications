@@ -1,0 +1,13 @@
+# callsets.yaml
+
+# The callset ID for an implementation
+# The callset class should be located by pkg_name.lib.mod_name.cls_name
+# Example ID 1: testrpc.lib.test.TestCallset
+1:
+  pkg: testrpc.lib
+  mod: test
+  cls: TestCallset
+2:
+  pkg: systemrpc.lib
+  mod: system
+  cls: SystemCallset
