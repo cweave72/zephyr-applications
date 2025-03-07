@@ -4,6 +4,9 @@ message("ZEPHYR_BASE = $ENV{ZEPHYR_BASE}")
 message("ZEPHYR_SDK_INSTALL_DIR = $ENV{ZEPHYR_SDK_INSTALL_DIR}")
 message("ZEPHYR_TOOLCHAIN_VARIANT = $ENV{ZEPHYR_TOOLCHAIN_VARIANT}")
 
+set(CONFIG_OUTPUT_DISASSEMBLY y CACHE INTERNAL "")
+set(CONFIG_OUTPUT_DISASSEMBLY_WITH_SOURCE y CACHE INTERNAL "")
+
 list(APPEND EXTRA_CONF_FILE
     ${CMAKE_CURRENT_SOURCE_DIR}/conf/kernel.conf
     ${CMAKE_CURRENT_SOURCE_DIR}/conf/nv.conf
@@ -24,7 +27,12 @@ include($ENV{WORKSPACE_BASE}/common/scripts/cmake/build_proto.cmake)
 # The following creates the target ${target}_proto.
 nanopb_build_sources(${target} $ENV{WORKSPACE_BASE}/proto)
 
-target_sources(${target} PRIVATE src/main.c)
+target_sources(
+    ${target}
+    PRIVATE
+    src/main.c
+    $ENV{WORKSPACE_BASE}/common/modules/TraceRam/src/TraceRam_backend.c
+    )
 
 target_compile_options(
     ${target}

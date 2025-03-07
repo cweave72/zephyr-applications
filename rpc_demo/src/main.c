@@ -5,9 +5,12 @@
 #include <zephyr/devicetree.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/drivers/gpio.h>
+#include <ctf_top.h>
 #include "WifiConnect.h"
 #include "TcpRpcServer.h"
 #include "NvParms.h"
+#include "TraceRam.h"
+#include "SwTimer.h"
 
 /** @brief Initialize the logging module. */
 LOG_MODULE_REGISTER(app, LOG_LEVEL_DBG);
@@ -19,7 +22,7 @@ LOG_MODULE_REGISTER(app, LOG_LEVEL_DBG);
 #include "SystemRpc.h"
 #include "SystemRpc.pb.h"
 
-#define RPCSERVER_STACK_SIZE    4*1024
+#define RPCSERVER_STACK_SIZE    1*1024
 
 static ProtoRpc_Callset_Entry callsets[] = {
     PROTORPC_ADD_CALLSET(1, TestRpc_resolver, test_TestCallset_fields, test_TestCallset_size),
@@ -27,11 +30,23 @@ static ProtoRpc_Callset_Entry callsets[] = {
 };
 
 static TcpRpcServer tcp_rpc;
+
+#define RPC_USE_STATIC  0
+
+#if RPC_USE_STATIC == 0
 static uint8_t *rpc_call_frame;
 static uint8_t *rpc_reply_frame;
 static uint8_t *rpc_callset_call_buf;
 static uint8_t *rpc_callset_reply_buf;
+#else
+static uint8_t rpc_call_frame[1008];
+static uint8_t rpc_reply_frame[1408];
+static uint8_t rpc_callset_call_buf[1000];
+static uint8_t rpc_callset_reply_buf[1408];
+#endif
+
 static ProtoRpc rpc;
+
 /******************************************************************************/
 
 static int
@@ -81,6 +96,7 @@ rpc_init(void)
 
     LOG_DBG("Max rpc callset size: %u", max_callset_size);
 
+#if RPC_USE_STATIC == 0
     rpc_call_frame = k_malloc(ProtoRpcHeader_size + max_callset_size);
     if (!rpc_call_frame)
     {
@@ -108,23 +124,30 @@ rpc_init(void)
         LOG_ERR("Error allocating memory for rpc_callset_reply_buf.");
         return -ENOMEM;
     }
+#endif
 
     /** @brief Init the rpc object. */
     rpc.call_frame             = rpc_call_frame;
     rpc.reply_frame            = rpc_reply_frame;
     rpc.callsets               = callsets;
     rpc.callset_call_buf       = rpc_callset_call_buf;
-    rpc.callset_call_buf_size  = max_callset_size;
+    rpc.callset_call_buf_size  = sizeof(rpc_callset_call_buf);
     rpc.callset_reply_buf      = rpc_callset_reply_buf;
-    rpc.callset_reply_buf_size = max_callset_size;
+    rpc.callset_reply_buf_size = sizeof(rpc_callset_reply_buf);
     rpc.num_callsets           = PROTORPC_ARRAY_LENGTH(callsets);
 
     return 0;
 }
 
+static inline void user_0(uint32_t el)
+{
+    CTF_EVENT(CTF_LITERAL(uint8_t, 0x99), el);
+}
+
 int main(void)
 {
     int ret;
+    SwTimer t;
 
     LOG_INF("RPC demo app.");
 
@@ -148,9 +171,16 @@ int main(void)
         20);
     if (ret < 0) LOG_ERR("Error initializing TcpRpcServer.");
 
+    LOG_INF("Enabling trace ram.");
+    TraceRam_enable();
+
     while (1)
     {
-        k_msleep(1000);
+        uint32_t el;
+        SwTimer_tic(&t);
+        k_msleep(100);
+        el = SwTimer_toc(&t);
+        user_0(el);
     }
 
     return 0;
