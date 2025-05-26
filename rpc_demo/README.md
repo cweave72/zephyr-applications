@@ -2,11 +2,24 @@
 
 This app demonstrates using the ProtoRpc library for executing RPCs.
 
-## Build Steps
+## Configuration
 
-Using the 01space esp32c4 .042 OLED board:
+The app supports the following CONFIGs for network type:
+* CONFIG_APP_NET_TYPE_WIFI : Uses wifi.
+* CONFIG_APP_NET_TYPE_SERIAL : Uses eth-serial
+
+## Wifi Networking
+
+Build:
 ```bash
-make BOARD=esp32c3_042_oled build
+make build BOARD=<board> CMAKE_OPTS="-DCONFIG_APP_NET_TYPE_WIFI=y"
+```
+
+See `boards/` for supported ESP32 boards.
+
+Example: Using the 01space esp32c4 .042 OLED board:
+```bash
+make build BOARD=esp32c3_042_oled CMAKE_OPTS="-DCONFIG_APP_NET_TYPE_WIFI=y"
 ```
 
 Flash the board (and optionally, run the monitor):
@@ -14,18 +27,22 @@ Flash the board (and optionally, run the monitor):
 make flash [mon]
 ```
 
-Build the python ProtoRpc bindings:
+## Serial Networking
+
+Build (supports qemu_x86_64):
 ```bash
-make proto
+make build BOARD=qemu_x86_64 CMAKE_OPTS="-DCONFIG_APP_NET_TYPE_SERIAL=y"
 ```
+
+### Setting up Serial Networking with QEMU
+
+TODO
+
 
 ## Running the python test app
 
-```bash
-cd python
-. init_venv.sh
-test_run --ip <board ip>
-```
+TODO:
+
 
 ## Debugging
 

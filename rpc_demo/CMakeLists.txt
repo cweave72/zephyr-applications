@@ -9,15 +9,30 @@ set(CONFIG_OUTPUT_DISASSEMBLY_WITH_SOURCE y CACHE INTERNAL "")
 
 list(APPEND EXTRA_CONF_FILE
     ${CMAKE_CURRENT_SOURCE_DIR}/conf/kernel.conf
-    ${CMAKE_CURRENT_SOURCE_DIR}/conf/nv.conf
     ${CMAKE_CURRENT_SOURCE_DIR}/conf/net.conf
-    ${CMAKE_CURRENT_SOURCE_DIR}/conf/wifi.conf
     ${CMAKE_CURRENT_SOURCE_DIR}/conf/modules.conf
     ${CMAKE_CURRENT_SOURCE_DIR}/conf/rpc.conf
+    ${CMAKE_CURRENT_SOURCE_DIR}/conf/tracing.conf
+    ${CMAKE_CURRENT_SOURCE_DIR}/conf/tracemodule.conf
 )
 
+if (CONFIG_APP_NET_TYPE_WIFI)
+    message(STATUS "[app] Using wifi networking.")
+    list(APPEND EXTRA_CONF_FILE ${CMAKE_CURRENT_SOURCE_DIR}/conf/nv.conf)
+    list(APPEND EXTRA_CONF_FILE ${CMAKE_CURRENT_SOURCE_DIR}/conf/wifi.conf)
+elseif (CONFIG_APP_NET_TYPE_SERIAL)
+    message(STATUS "[app] Using serial networking.")
+    list(APPEND EXTRA_CONF_FILE ${CMAKE_CURRENT_SOURCE_DIR}/conf/serial_net.conf)
+else ()
+    message(WARNING "[app] Using wifi networking since CONFIG_APP_NET_TYPE not specified (see app Kconfig).")
+    list(APPEND EXTRA_CONF_FILE ${CMAKE_CURRENT_SOURCE_DIR}/conf/nv.conf)
+    list(APPEND EXTRA_CONF_FILE ${CMAKE_CURRENT_SOURCE_DIR}/conf/wifi.conf)
+endif()
+
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
+
 project(rpc_demo)
+
 
 set(target app)
 
@@ -31,6 +46,13 @@ target_sources(
     ${target}
     PRIVATE
     src/main.c
+    src/rpc.c
+    )
+
+target_sources_ifdef(
+    CONFIG_TRACERAM
+    ${target}
+    PRIVATE 
     $ENV{WORKSPACE_BASE}/common/modules/TraceRam/src/TraceRam_backend.c
     )
 

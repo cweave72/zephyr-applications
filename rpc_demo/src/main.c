@@ -5,49 +5,16 @@
 #include <zephyr/devicetree.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/drivers/gpio.h>
-#include <ctf_top.h>
-#include "WifiConnect.h"
-#include "TcpRpcServer.h"
-#include "NvParms.h"
-#include "TraceRam.h"
 #include "SwTimer.h"
+#include "rpc.h"
 
 /** @brief Initialize the logging module. */
 LOG_MODULE_REGISTER(app, LOG_LEVEL_DBG);
 
 /******************************************************************************/
-/** @brief RPC Declarations */
-#include "TestRpc.h"
-#include "TestRpc.pb.h"
-#include "SystemRpc.h"
-#include "SystemRpc.pb.h"
-
-#define RPCSERVER_STACK_SIZE    1*1024
-
-static ProtoRpc_Callset_Entry callsets[] = {
-    PROTORPC_ADD_CALLSET(1, TestRpc_resolver, test_TestCallset_fields, test_TestCallset_size),
-    PROTORPC_ADD_CALLSET(2, SystemRpc_resolver, system_SystemCallset_fields, system_SystemCallset_size),
-};
-
-static TcpRpcServer tcp_rpc;
-
-#define RPC_USE_STATIC  0
-
-#if RPC_USE_STATIC == 0
-static uint8_t *rpc_call_frame;
-static uint8_t *rpc_reply_frame;
-static uint8_t *rpc_callset_call_buf;
-static uint8_t *rpc_callset_reply_buf;
-#else
-static uint8_t rpc_call_frame[1008];
-static uint8_t rpc_reply_frame[1408];
-static uint8_t rpc_callset_call_buf[1000];
-static uint8_t rpc_callset_reply_buf[1408];
-#endif
-
-static ProtoRpc rpc;
-
-/******************************************************************************/
+#if defined(CONFIG_APP_NET_TYPE_WIFI)
+#include "NvParms.h"
+#include "WifiConnect.h"
 
 static int
 init_wifi(void)
@@ -77,72 +44,147 @@ init_wifi(void)
     WifiConnect_connect(ssid, pass);
     return 0;
 }
-
-/** @brief Allocate frame buffers based on max length callset size and init the
-      rpc object. */
-static int
-rpc_init(void)
-{
-    uint32_t k;
-    uint32_t max_callset_size = 0;
-
-    for (k = 0; k < PROTORPC_ARRAY_LENGTH(callsets); k++)
-    {
-        if (callsets[k].size > max_callset_size)
-        {
-            max_callset_size = callsets[k].size;
-        }
-    }
-
-    LOG_DBG("Max rpc callset size: %u", max_callset_size);
-
-#if RPC_USE_STATIC == 0
-    rpc_call_frame = k_malloc(ProtoRpcHeader_size + max_callset_size);
-    if (!rpc_call_frame)
-    {
-        LOG_ERR("Error allocating memory for rpc_call_frame.");
-        return -ENOMEM;
-    }
-
-    rpc_reply_frame = k_malloc(ProtoRpcHeader_size + max_callset_size);
-    if (!rpc_reply_frame)
-    {
-        LOG_ERR("Error allocating memory for rpc_reply_frame.");
-        return -ENOMEM;
-    }
-
-    rpc_callset_call_buf = k_malloc(max_callset_size);
-    if (!rpc_callset_call_buf)
-    {
-        LOG_ERR("Error allocating memory for rpc_callset_call_buf.");
-        return -ENOMEM;
-    }
-
-    rpc_callset_reply_buf = k_malloc(max_callset_size);
-    if (!rpc_callset_reply_buf)
-    {
-        LOG_ERR("Error allocating memory for rpc_callset_reply_buf.");
-        return -ENOMEM;
-    }
 #endif
 
-    /** @brief Init the rpc object. */
-    rpc.call_frame             = rpc_call_frame;
-    rpc.reply_frame            = rpc_reply_frame;
-    rpc.callsets               = callsets;
-    rpc.callset_call_buf       = rpc_callset_call_buf;
-    rpc.callset_call_buf_size  = sizeof(rpc_callset_call_buf);
-    rpc.callset_reply_buf      = rpc_callset_reply_buf;
-    rpc.callset_reply_buf_size = sizeof(rpc_callset_reply_buf);
-    rpc.num_callsets           = PROTORPC_ARRAY_LENGTH(callsets);
+#if defined(CONFIG_APP_NET_TYPE_SERIAL)
+#include <zephyr/net/net_config.h>
+#include <zephyr/net/net_if.h>
+#include <zephyr/net/net_mgmt.h>
+#include <zephyr/net/net_event.h>
+#include <zephyr/net/conn_mgr_monitor.h>
+
+#define EVENT_MASK (NET_EVENT_L4_CONNECTED | \
+                    NET_EVENT_L4_DISCONNECTED)
+
+static struct net_mgmt_event_callback mgmt_cb;
+static bool connected = false;
+
+static K_SEM_DEFINE(l4_connected, 0, 1);
+
+static void
+init_ip(void)
+{
+    struct net_if *iface;
+    struct net_if_addr *ifaddr;
+    struct in_addr my_ipv4_addr;
+    struct in_addr my_ipv4_mask;
+    struct in_addr my_ipv4_gw;
+
+    iface = net_if_get_default();
+
+    LOG_INF("Setting IP address for iface:");
+    LOG_INF("  addr: %s", CONFIG_APP_IPV4_ADDR);
+    LOG_INF("  mask: %s", CONFIG_APP_IPV4_MASK);
+    LOG_INF("  gw  : %s", CONFIG_APP_IPV4_GW);
+
+    net_addr_pton(AF_INET, CONFIG_APP_IPV4_ADDR, &my_ipv4_addr);
+    net_addr_pton(AF_INET, CONFIG_APP_IPV4_MASK, &my_ipv4_mask);
+    net_addr_pton(AF_INET, CONFIG_APP_IPV4_GW, &my_ipv4_gw);
+
+    ifaddr = net_if_ipv4_addr_add(iface, &my_ipv4_addr, NET_ADDR_MANUAL, 0);
+    if (!ifaddr)
+    {
+        LOG_ERR("Error setting IP address");
+        return;
+    }
+
+    net_if_ipv4_set_netmask_by_addr(iface, &my_ipv4_addr, &my_ipv4_mask);
+    net_if_ipv4_set_gw(iface, &my_ipv4_gw);
+}
+
+static void
+l4_event_handler(
+    struct net_mgmt_event_callback *cb,
+    uint32_t mgmt_event,
+    struct net_if *iface)
+{
+    ARG_UNUSED(iface);
+    ARG_UNUSED(cb);
+
+    LOG_DBG("mgmt_event = 0x%08x (EVENT_MASK = 0x%08x).",
+        mgmt_event, (unsigned int)EVENT_MASK);
+
+    switch (mgmt_event)
+    {
+    case NET_EVENT_L4_CONNECTED:
+        LOG_DBG("NET_EVENT_L4_CONNECTED");
+        connected = true;
+        k_sem_give(&l4_connected);
+        break;
+    case NET_EVENT_L4_DISCONNECTED:
+        LOG_DBG("NET_EVENT_L4_DISCONNECTED");
+        if (connected)
+        {
+            LOG_INF("Network disconnected event");
+            connected = false;
+        }
+        LOG_DBG("Resetting sem.");
+        k_sem_reset(&l4_connected);
+        break;
+    case NET_EVENT_L4_IPV4_CONNECTED:
+        LOG_DBG("NET_EVENT_L4_IPV4_CONNECTED");
+        break;
+    case NET_EVENT_L4_IPV4_DISCONNECTED:
+        LOG_DBG("NET_EVENT_L4_IPV4_DISCONNECTED");
+        break;
+    case NET_EVENT_L4_IPV6_CONNECTED:
+        LOG_DBG("NET_EVENT_L4_IPV6_CONNECTED");
+        break;
+    case NET_EVENT_L4_IPV6_DISCONNECTED:
+        LOG_DBG("NET_EVENT_L4_IPV6_DISCONNECTED");
+        break;
+
+    default:
+        break;
+    }
+
+}
+
+static int
+network_init(void)
+{
+    int ret;
+
+    if (!IS_ENABLED(CONFIG_NET_CONNECTION_MANAGER))
+    {
+        LOG_ERR("Must set CONFIG_NET_CONNECTION_MANAGER=y in Kconfig.");
+        return -1;
+    }
+
+    net_mgmt_init_event_callback(&mgmt_cb, l4_event_handler, EVENT_MASK);
+    net_mgmt_add_event_callback(&mgmt_cb);
+    conn_mgr_mon_resend_status();
+
+    init_ip();
+
+    ret = net_config_init_app(NULL, "Initializing network");
+    if (ret < 0)
+    {
+        LOG_ERR("Failed network init (%d)", ret);
+        return ret;
+    }
+
+    LOG_INF("Waiting for network connection...");
+
+    /* Wait for the connection. */
+    k_sem_take(&l4_connected, K_FOREVER);
+
+    LOG_INF("Network connected.");
 
     return 0;
 }
+#endif
 
-static inline void user_0(uint32_t el)
-{
-    CTF_EVENT(CTF_LITERAL(uint8_t, 0x99), el);
-}
+
+#if defined(CONFIG_TRACERAM)
+#include <ctf_top.h>
+#include "TraceRam.h"
+//
+//static inline void user_0(uint32_t el)
+//{
+//    CTF_EVENT(CTF_LITERAL(uint8_t, 0x99), el);
+//}
+#endif
 
 int main(void)
 {
@@ -151,28 +193,27 @@ int main(void)
 
     LOG_INF("RPC demo app.");
 
+#if defined(CONFIG_APP_NET_TYPE_WIFI)
     ret = NvParms_init();
     if (ret < 0)
     {
         LOG_ERR("NvParms module init error : %d", ret);
         return 0;
     }
-
     init_wifi();
+#endif
+
+#if defined(CONFIG_APP_NET_TYPE_SERIAL)
+    network_init();
+#endif
 
     rpc_init();
+    rpc_start_server();
 
-    /* Start TCP Rcp server. */
-    ret = TcpRpcServer_init(
-        &tcp_rpc,
-        &rpc,
-        13001, 
-        RPCSERVER_STACK_SIZE,
-        20);
-    if (ret < 0) LOG_ERR("Error initializing TcpRpcServer.");
-
+#if defined(CONFIG_TRACERAM)
     LOG_INF("Enabling trace ram.");
     TraceRam_enable();
+#endif
 
     while (1)
     {
@@ -180,7 +221,11 @@ int main(void)
         SwTimer_tic(&t);
         k_msleep(100);
         el = SwTimer_toc(&t);
-        user_0(el);
+
+        //#if defined(CONFIG_TRACERAM)
+        //        user_0(el);
+        //#endif
+
     }
 
     return 0;
