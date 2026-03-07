@@ -3,26 +3,29 @@
  *  
  *  @brief: Declarations and init for rpc.
 *******************************************************************************/
-#include "TestRpc.h"
-#include "TestRpc.pb.h"
-#include "SystemRpc.h"
-#include "SystemRpc.pb.h"
 #include "TcpRpcServer.h"
 #include "ProtoRpc.h"
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_DECLARE(app, LOG_LEVEL_DBG);
 
-#define RPCSERVER_STACK_SIZE    1*1024
+#include "TestRpc.h"
+#include "TestRpc.pb.h"
+#include "SystemRpc.h"
+#include "SystemRpc.pb.h"
+#include "RtosUtilsRpc.h"
+#include "RtosUtilsRpc.pb.h"
 
 static ProtoRpc_Callset_Entry callsets[] = {
     PROTORPC_ADD_CALLSET(1, TestRpc_resolver, test_TestCallset_fields, test_TestCallset_size),
     PROTORPC_ADD_CALLSET(2, SystemRpc_resolver, system_SystemCallset_fields, system_SystemCallset_size),
+    PROTORPC_ADD_CALLSET(3, RtosUtilsRpc_resolver, rtosutils_Callset_fields, rtosutils_Callset_size),
 };
 
 static TcpRpcServer tcp_rpc;
 static ProtoRpc rpc;
 
+#define RPCSERVER_STACK_SIZE    2*1024
 #define RPC_USE_STATIC  0
 
 #if RPC_USE_STATIC == 0

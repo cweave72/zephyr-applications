@@ -22,6 +22,11 @@ Example: Using the 01space esp32c4 .042 OLED board:
 make build BOARD=esp32c3_042_oled CMAKE_OPTS="-DCONFIG_APP_NET_TYPE_WIFI=y"
 ```
 
+Example: Using the esp32 matrix:
+```bash
+make build BOARD=esp32s3_matrix/esp32s3/procpu"
+```
+
 Flash the board (and optionally, run the monitor):
 ```bash
 make flash [mon]
@@ -41,8 +46,16 @@ TODO
 
 ## Running the python test app
 
-TODO:
+```
+cd <workspace root>/python
+uv sync --reinstall
+. init_venv.sh
+```
 
+To display running threads (example board at IP 192.168.1.168:
+```
+(.venv) rtosutils-cli --ip 192.168.1.168 -c <path/to/applications>/rpc_demo/callsets.yaml get-tasks
+```
 
 ## Debugging
 

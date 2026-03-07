@@ -39,6 +39,15 @@ optionally run the script.
 ACTION=="add", SUBSYSTEM=="net", ATTR{address}=="00:00:5e:00:53:01", NAME="usb_zeph", RUN+="/opt/usb_zeph/on_connect.sh"
 ```
 
+Example `on_connect.sh` to simply log connections:
+```bash
+#!/bin/sh
+
+log=/opt/usb_zeph/udev.txt
+
+echo "$(date): Zephyr usb connect." > $log
+```
+
 * Then:
 
 ```bash

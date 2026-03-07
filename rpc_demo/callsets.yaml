@@ -1,13 +1,28 @@
 # callsets.yaml
+#
+# ID:
+#  name: Name used as the key in the api dict.
+#  pkg: Package name where the protobuf bindings are located.
+#  mod: Module name of the protobuf bindings (matches the 'package' name in the
+#       .proto file).
+#  cls: Name of the callset message in the .proto file. This becomes the callset
+#       class in the python bindings.
 
 # The callset ID for an implementation
 # The callset class should be located by pkg_name.lib.mod_name.cls_name
 # Example ID 1: testrpc.lib.test.TestCallset
 1:
+  name: testrpc
   pkg: testrpc.lib
   mod: test
   cls: TestCallset
 2:
+  name: systemrpc
   pkg: systemrpc.lib
   mod: system
   cls: SystemCallset
+3:
+  name: rtosutils
+  pkg: rtosutils.lib
+  mod: rtosutils
+  cls: Callset
