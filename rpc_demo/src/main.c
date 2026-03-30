@@ -40,7 +40,7 @@ init_wifi(void)
     LOG_DBG("ssid=%s", ssid);
     LOG_DBG("password length=%d", pass_len);
 
-    WifiConnect_init();
+    //WifiConnect_init();
     WifiConnect_connect(ssid, pass);
     return 0;
 }

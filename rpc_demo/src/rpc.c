@@ -17,15 +17,14 @@ LOG_MODULE_DECLARE(app, LOG_LEVEL_DBG);
 #include "RtosUtilsRpc.pb.h"
 
 static ProtoRpc_Callset_Entry callsets[] = {
-    PROTORPC_ADD_CALLSET(1, TestRpc_resolver, test_TestCallset_fields, test_TestCallset_size),
-    PROTORPC_ADD_CALLSET(2, SystemRpc_resolver, system_SystemCallset_fields, system_SystemCallset_size),
-    PROTORPC_ADD_CALLSET(3, RtosUtilsRpc_resolver, rtosutils_Callset_fields, rtosutils_Callset_size),
+    PROTORPC_ADD_CALLSET(0, SystemRpc_resolver, system_Callset),
+    PROTORPC_ADD_CALLSET(1, RtosUtilsRpc_resolver, rtosutils_Callset),
 };
 
 static TcpRpcServer tcp_rpc;
 static ProtoRpc rpc;
 
-#define RPCSERVER_STACK_SIZE    2*1024
+#define RPCSERVER_STACK_SIZE    4*1024
 #define RPC_USE_STATIC  0
 
 #if RPC_USE_STATIC == 0
@@ -48,11 +47,13 @@ static uint8_t rpc_callset_reply_buf[1408];
 int
 rpc_start_server(void)
 {
+    LOG_INF("Starting tcp rpc server on port %u.", CONFIG_TCPRPCSERVER_PORT);
+
     /* Start TCP Rcp server. */
     int ret = TcpRpcServer_init(
         &tcp_rpc,
         &rpc,
-        13001, 
+        CONFIG_TCPRPCSERVER_PORT,
         RPCSERVER_STACK_SIZE,
         20);
     if (ret < 0) LOG_ERR("Error initializing TcpRpcServer.");

@@ -24,7 +24,7 @@ make build BOARD=esp32c3_042_oled CMAKE_OPTS="-DCONFIG_APP_NET_TYPE_WIFI=y"
 
 Example: Using the esp32 matrix:
 ```bash
-make build BOARD=esp32s3_matrix/esp32s3/procpu"
+make build BOARD=esp32s3_matrix/esp32s3/procpu
 ```
 
 Flash the board (and optionally, run the monitor):
