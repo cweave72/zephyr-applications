@@ -3,8 +3,11 @@
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
 #include <zephyr/devicetree.h>
+#include <zephyr/sys/reboot.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/drivers/gpio.h>
+#include <zephyr/net/net_if.h>
+#include <zephyr/net/wifi_mgmt.h>
 #include "SwTimer.h"
 #include "rpc.h"
 
@@ -15,6 +18,13 @@ LOG_MODULE_REGISTER(app, LOG_LEVEL_DBG);
 #if defined(CONFIG_APP_NET_TYPE_WIFI)
 #include "NvParms.h"
 #include "WifiConnect.h"
+
+static void
+wifi_error(void)
+{
+    LOG_ERR("Rebooting system.");
+    sys_reboot(SYS_REBOOT_COLD);
+}
 
 static int
 init_wifi(void)
@@ -41,7 +51,7 @@ init_wifi(void)
     LOG_DBG("password length=%d", pass_len);
 
     //WifiConnect_init();
-    WifiConnect_connect(ssid, pass);
+    WifiConnect_connect(ssid, pass, wifi_error);
     return 0;
 }
 #endif
@@ -217,10 +227,11 @@ int main(void)
 
     while (1)
     {
-        uint32_t el;
-        SwTimer_tic(&t);
-        k_msleep(100);
-        el = SwTimer_toc(&t);
+
+        k_msleep(40000);
+        // Force disconnect for testing.
+        //struct net_if *iface = net_if_get_default();
+        //net_mgmt(NET_REQUEST_WIFI_DISCONNECT, iface, NULL, 0);
 
         //#if defined(CONFIG_TRACERAM)
         //        user_0(el);

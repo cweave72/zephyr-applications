@@ -4,7 +4,6 @@
  *  @brief: Code for reading sensor data
 *******************************************************************************/
 #include <zephyr/data/json.h>
-#include "lwm2m_util.h"
 #include "sensor.h"
 
 #include <zephyr/logging/log.h>
@@ -38,13 +37,42 @@ static const struct json_obj_descr json_result[] = {
     JSON_OBJ_DESCR_PRIM(struct sensor_result, hum, JSON_TOK_FLOAT),
 };
 
+/* Fixed-precision float formatter. Avoids pulling in CONFIG_LWM2M just for
+ * lwm2m_ftoa()'s float-to-string conversion. */
 static int
 float_to_string(double *value, char *out, uint32_t outlen, uint8_t num_precision)
 {
+    int64_t scale = 1;
     int len;
 
-    len = lwm2m_ftoa(value, out, outlen, num_precision);
-    if (len < 0 || len >= outlen)
+    for (uint8_t i = 0; i < num_precision; i++)
+    {
+        scale *= 10;
+    }
+
+    double scaled = *value * (double)scale;
+    int64_t rounded = (int64_t)(scaled + (scaled >= 0 ? 0.5 : -0.5));
+    int64_t int_part = rounded / scale;
+    int64_t frac_part = rounded % scale;
+
+    if (frac_part < 0)
+    {
+        frac_part = -frac_part;
+    }
+
+    /* Sign is lost from int_part when the magnitude is < 1 (e.g. -0.5). */
+    if (int_part == 0 && rounded < 0)
+    {
+        len = snprintf(out, outlen, "-%lld.%0*lld",
+            (long long)int_part, num_precision, (long long)frac_part);
+    }
+    else
+    {
+        len = snprintf(out, outlen, "%lld.%0*lld",
+            (long long)int_part, num_precision, (long long)frac_part);
+    }
+
+    if (len < 0 || (uint32_t)len >= outlen)
     {
         LOG_ERR("Failed to encode float value");
         return -EINVAL;
@@ -92,6 +120,23 @@ update_display(const struct sensor_value *temp, const struct sensor_value *hum)
     snprintf(str, sizeof(str), "Hum: %u", hum->val1);
     cfb_print(display_dev, str, 0, 8);
     cfb_framebuffer_finalize(display_dev);
+}
+
+void
+sensor_conv_to_fixedpt(
+    const struct sensor_value *temp,
+    const struct sensor_value *hum,
+    uint8_t temp_fl,
+    uint8_t hum_fl,
+    int32_t *deg_f,
+    int32_t *hum_pct)
+{
+    double deg_c = temp->val1 + (double)(temp->val2)*0.000001;
+    double _deg_f = deg_c*9/5 + 32.;
+    double _hum_pct = hum->val1 + (double)(hum->val2)*0.000001;
+
+    *deg_f = (int32_t)(_deg_f * (double)(int32_t)(0x1 << temp_fl));
+    *hum_pct = (int32_t)(_hum_pct * (double)(int32_t)(0x1 << hum_fl)); 
 }
 
 int
