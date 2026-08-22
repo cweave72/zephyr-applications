@@ -111,8 +111,8 @@ int main(void)
         while (1) { RTOS_TASK_SLEEP_ms(5000); }
     }
 
-    Publisher_createTopic(&hello_topic, "[hello]: ", PUB_TYPE_STRING);
-    Publisher_createTopic(&sensor_topic, "[sensor]: ", PUB_TYPE_PROTOBUF);
+    Publisher_createTopic(&hello_topic, "hello", PUB_TYPE_STRING);
+    Publisher_createTopic(&sensor_topic, "sensor", PUB_TYPE_PROTOBUF);
 
     sensor_TempSensor temp_sensor;
     uint8_t buf[128];

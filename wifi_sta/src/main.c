@@ -28,7 +28,7 @@ K_EVENT_DEFINE(event_flags);
 #define THREAD_STACKSIZE 1024
 #define THREAD_PRIO  7
 
-K_THREAD_STACK_DEFINE(thread_stack, THREAD_STACKSIZE);
+static K_THREAD_STACK_DEFINE(thread_stack, THREAD_STACKSIZE);
 static struct k_thread thread;
 
 static int

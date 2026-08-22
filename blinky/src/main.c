@@ -12,7 +12,7 @@
 /** @brief Initialize the logging module. */
 LOG_MODULE_REGISTER(app, LOG_LEVEL_DBG);
 
-#define SLEEP_TIME_MS   100
+#define SLEEP_TIME_MS   500
 
 /* The devicetree node identifier for the "led0" alias. */
 #define LED0_NODE DT_ALIAS(led0)
@@ -25,7 +25,7 @@ K_EVENT_DEFINE(event_flags);
 #define THREAD_STACKSIZE 1024
 #define THREAD_PRIO  7
 
-K_THREAD_STACK_DEFINE(thread_stack, THREAD_STACKSIZE);
+static K_THREAD_STACK_DEFINE(thread_stack, THREAD_STACKSIZE);
 static struct k_thread thread;
 
 /** @brief Demonstration thread for blinking LED. */
