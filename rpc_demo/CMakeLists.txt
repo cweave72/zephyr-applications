@@ -16,20 +16,29 @@ list(APPEND EXTRA_CONF_FILE
     ${CMAKE_CURRENT_SOURCE_DIR}/conf/tracemodule.conf
 )
 
-if (CONFIG_APP_NET_TYPE_WIFI)
-    message(STATUS "[app] Using wifi networking.")
+# Which networking fragment to apply. Declare the type with
+# CONFIG_APP_NET_TYPE_<X>=y in boards/<board>.conf (or prj.conf); the helper reads
+# that declaration here, because CONFIG_* are not CMake variables until
+# find_package(Zephyr) below has run Kconfig -- by which point EXTRA_CONF_FILE is
+# already consumed. See the header of app_net_type.cmake.
+#
+# The "wifi" fallback must match the 'choice APP_NET_TYPE' default in Kconfig.
+include($ENV{WORKSPACE_BASE}/common/scripts/cmake/app_net_type.cmake)
+app_net_type_resolve(APP_NET_TYPE wifi)
+
+if (APP_NET_TYPE STREQUAL "wifi")
     list(APPEND EXTRA_CONF_FILE ${CMAKE_CURRENT_SOURCE_DIR}/conf/nv.conf)
     list(APPEND EXTRA_CONF_FILE ${CMAKE_CURRENT_SOURCE_DIR}/conf/wifi.conf)
-elseif (CONFIG_APP_NET_TYPE_SERIAL)
-    message(STATUS "[app] Using serial networking.")
+elseif (APP_NET_TYPE STREQUAL "serial")
     list(APPEND EXTRA_CONF_FILE ${CMAKE_CURRENT_SOURCE_DIR}/conf/serial_net.conf)
-else ()
-    message(WARNING "[app] Using wifi networking since CONFIG_APP_NET_TYPE not specified (see app Kconfig).")
-    list(APPEND EXTRA_CONF_FILE ${CMAKE_CURRENT_SOURCE_DIR}/conf/nv.conf)
-    list(APPEND EXTRA_CONF_FILE ${CMAKE_CURRENT_SOURCE_DIR}/conf/wifi.conf)
+elseif (APP_NET_TYPE STREQUAL "eth")
+    list(APPEND EXTRA_CONF_FILE ${CMAKE_CURRENT_SOURCE_DIR}/conf/wired_eth_net.conf)
 endif()
 
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
+
+# Kconfig has now run. Fail loudly if it disagrees with the fragment we applied.
+app_net_type_verify(${APP_NET_TYPE})
 
 project(rpc_demo)
 
@@ -47,6 +56,13 @@ target_sources(
     PRIVATE
     src/main.c
     src/rpc.c
+    )
+
+target_sources_ifdef(
+    CONFIG_APP_NET_TYPE_ETH
+    ${target}
+    PRIVATE 
+    src/wired_net.c
     )
 
 target_sources_ifdef(

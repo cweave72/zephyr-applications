@@ -1,0 +1,33 @@
+/*
+ * Console on UART0 (GP0/GP1) instead of the board default USB CDC-ACM.
+ *
+ * The board puts the console on its own USB-C CDC-ACM device so that a bare
+ * board needs no extra hardware. That device is enumerated by the RP2040
+ * itself, which has two costs while developing this app:
+ *
+ *   - it disappears on every reset, reflash and gdb halt, so the terminal has
+ *     to be reopened each time; and
+ *   - it enumerates long after boot, so the early log lines are always lost.
+ *
+ * UART0 is live from the first instruction and is driven by a separate device
+ * (the Raspberry Pi Debug Probe's UART bridge, or any USB-TTL adapter), so the
+ * terminal stays put across resets and shows the whole boot.
+ *
+ * Requires wiring, or this port is silent:
+ *   probe U connector TX (orange) -> GP1  (UART0 RX)
+ *                     GND (black) -> GND
+ *                     RX  (yellow)-> GP0  (UART0 TX)
+ *
+ * uart0 is already status = "okay" with uart0_default pinctrl on GP0/GP1 in the
+ * board dts, so only the chosen nodes need repointing. See
+ * common/boards/wiznet/w55rp20_evb_pico/README.md.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/ {
+	chosen {
+		zephyr,console = &uart0;
+		zephyr,shell-uart = &uart0;
+	};
+};

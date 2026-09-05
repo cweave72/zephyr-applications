@@ -1,72 +1,12 @@
-/** @brief This examples demonstrates: RPC over Wifi
-*/
 #include <zephyr/kernel.h>
-#include <zephyr/device.h>
-#include <zephyr/devicetree.h>
-#include <zephyr/sys/reboot.h>
 #include <zephyr/logging/log.h>
-#include <zephyr/drivers/gpio.h>
-#include <zephyr/net/net_if.h>
-#include <zephyr/net/wifi_mgmt.h>
-#include "SwTimer.h"
-#include "rpc.h"
-
-/** @brief Initialize the logging module. */
-LOG_MODULE_REGISTER(app, CONFIG_APP_LOG_LEVEL);
-
-/******************************************************************************/
-#if defined(CONFIG_APP_NET_TYPE_WIFI)
-#include "NvParms.h"
-#include "WifiConnect.h"
-
-static void
-wifi_error(void)
-{
-    LOG_ERR("Rebooting system.");
-    sys_reboot(SYS_REBOOT_COLD);
-}
-
-static int
-init_wifi(void)
-{
-    char ssid[32];
-    char pass[32];
-    int ret, pass_len;
-
-    ret = NvParms_load("ssid", NVPARMS_TYPE_STRING, ssid, sizeof(ssid));
-    if (ret <= 0)
-    {
-        LOG_ERR("Error getting ssid from NV: %d", ret);
-        return -1;
-    }
-
-    pass_len = NvParms_load("pass", NVPARMS_TYPE_STRING, pass, sizeof(pass));
-    if (pass_len <= 0)
-    {
-        LOG_ERR("Error getting pass from NV: %d", pass_len);
-        return -1;
-    }
-
-    LOG_DBG("ssid=%s", ssid);
-    LOG_DBG("password length=%d", pass_len);
-
-    //WifiConnect_init();
-    WifiConnect_connect(ssid, pass, wifi_error);
-    return 0;
-}
-#endif
-
-#if defined(CONFIG_APP_NET_TYPE_SERIAL) || defined(CONFIG_APP_NET_TYPE_ETH)
-#include "wired_net.h"
-#endif
-
-#if 0
-#if defined(CONFIG_APP_NET_TYPE_SERIAL)
 #include <zephyr/net/net_config.h>
 #include <zephyr/net/net_if.h>
 #include <zephyr/net/net_mgmt.h>
 #include <zephyr/net/net_event.h>
 #include <zephyr/net/conn_mgr_monitor.h>
+
+LOG_MODULE_DECLARE(app, CONFIG_APP_LOG_LEVEL);
 
 #define EVENT_MASK (NET_EVENT_L4_CONNECTED | \
                     NET_EVENT_L4_DISCONNECTED)
@@ -122,12 +62,12 @@ l4_event_handler(
     switch (mgmt_event)
     {
     case NET_EVENT_L4_CONNECTED:
-        LOG_DBG("NET_EVENT_L4_CONNECTED");
+        LOG_INF("NET_EVENT_L4_CONNECTED");
         connected = true;
         k_sem_give(&l4_connected);
         break;
     case NET_EVENT_L4_DISCONNECTED:
-        LOG_DBG("NET_EVENT_L4_DISCONNECTED");
+        LOG_INF("NET_EVENT_L4_DISCONNECTED");
         if (connected)
         {
             LOG_INF("Network disconnected event");
@@ -137,25 +77,24 @@ l4_event_handler(
         k_sem_reset(&l4_connected);
         break;
     case NET_EVENT_L4_IPV4_CONNECTED:
-        LOG_DBG("NET_EVENT_L4_IPV4_CONNECTED");
+        LOG_INF("NET_EVENT_L4_IPV4_CONNECTED");
         break;
     case NET_EVENT_L4_IPV4_DISCONNECTED:
-        LOG_DBG("NET_EVENT_L4_IPV4_DISCONNECTED");
+        LOG_INF("NET_EVENT_L4_IPV4_DISCONNECTED");
         break;
     case NET_EVENT_L4_IPV6_CONNECTED:
-        LOG_DBG("NET_EVENT_L4_IPV6_CONNECTED");
+        LOG_INF("NET_EVENT_L4_IPV6_CONNECTED");
         break;
     case NET_EVENT_L4_IPV6_DISCONNECTED:
-        LOG_DBG("NET_EVENT_L4_IPV6_DISCONNECTED");
+        LOG_INF("NET_EVENT_L4_IPV6_DISCONNECTED");
         break;
 
     default:
         break;
     }
-
 }
 
-static int
+int
 network_init(void)
 {
     int ret;
@@ -170,7 +109,9 @@ network_init(void)
     net_mgmt_add_event_callback(&mgmt_cb);
     conn_mgr_mon_resend_status();
 
+#if defined(CONFIG_APP_USE_STATIC_IP)
     init_ip();
+#endif
 
     ret = net_config_init_app(NULL, "Initializing network");
     if (ret < 0)
@@ -185,53 +126,6 @@ network_init(void)
     k_sem_take(&l4_connected, K_FOREVER);
 
     LOG_INF("Network connected.");
-
-    return 0;
-}
-#endif
-#endif
-
-#if defined(CONFIG_TRACERAM)
-#include <ctf_top.h>
-#include "TraceRam.h"
-//
-//static inline void user_0(uint32_t el)
-//{
-//    CTF_EVENT(CTF_LITERAL(uint8_t, 0x99), el);
-//}
-#endif
-
-int main(void)
-{
-    LOG_INF("RPC demo app.");
-
-#if defined(CONFIG_APP_NET_TYPE_WIFI)
-    int ret = NvParms_init();
-    if (ret < 0)
-    {
-        LOG_ERR("NvParms module init error : %d", ret);
-        return 0;
-    }
-    init_wifi();
-#endif
-
-#if defined(CONFIG_APP_NET_TYPE_SERIAL) || defined(CONFIG_APP_NET_TYPE_ETH)
-    network_init();
-#endif
-
-    rpc_init();
-    rpc_start_server();
-
-#if defined(CONFIG_TRACERAM)
-    LOG_INF("Enabling trace ram.");
-    TraceRam_enable();
-#endif
-
-    while (1)
-    {
-        k_msleep(5000);
-        LOG_WRN("Hello.");
-    }
 
     return 0;
 }

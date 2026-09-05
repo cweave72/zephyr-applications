@@ -4,22 +4,55 @@ This app demonstrates using the ProtoRpc library for executing RPCs.
 
 ## Configuration
 
-The app supports the following CONFIGs for network type:
-* CONFIG_APP_NET_TYPE_WIFI : Uses wifi.
-* CONFIG_APP_NET_TYPE_SERIAL : Uses eth-serial
+The app supports three network types, one per `conf/` fragment:
+
+| Symbol | Transport | Fragment applied |
+|---|---|---|
+| `CONFIG_APP_NET_TYPE_WIFI` | wifi | `conf/wifi.conf` + `conf/nv.conf` |
+| `CONFIG_APP_NET_TYPE_SERIAL` | eth-serial | `conf/serial_net.conf` |
+| `CONFIG_APP_NET_TYPE_ETH` | wired ethernet | `conf/wired_eth_net.conf` |
+
+**Declare the type in the board's own fragment**, `boards/<board>.conf` — one line,
+and nothing is needed on the make command line:
+
+```
+CONFIG_APP_NET_TYPE_ETH=y
+```
+
+`boards/w55rp20_evb_pico.conf` does exactly this. Put the line in `prj.conf` instead
+to set an app-wide default; with no declaration anywhere the build falls back to wifi.
+The build prints which type it chose and where the declaration came from:
+
+```
+-- [app] Using wired ethernet networking (from boards/w55rp20_evb_pico.conf).
+```
+
+For a one-off override, the command-line form still works and takes precedence over
+the board fragment:
+
+```bash
+make build BOARD=<board> CMAKE_OPTS="-DCONFIG_APP_NET_TYPE_SERIAL=y"
+```
+
+Note the declaration must be a real Kconfig line, because it does double duty: it sets
+the Kconfig symbol *and* tells CMake which `conf/` fragment to apply. CMake cannot read
+Kconfig symbols (they do not exist until `find_package(Zephyr)` has run, by which point
+the fragment list is already fixed), so `common/scripts/cmake/app_net_type.cmake` reads
+the declaration directly and then asserts after Kconfig that the two agree. A mismatch
+is a hard build error rather than a silently wrong config.
 
 ## Wifi Networking
 
 Build:
 ```bash
-make build BOARD=<board> CMAKE_OPTS="-DCONFIG_APP_NET_TYPE_WIFI=y"
+make build BOARD=<board>
 ```
 
 See `boards/` for supported ESP32 boards.
 
 Example: Using the 01space esp32c4 .042 OLED board:
 ```bash
-make build BOARD=esp32c3_042_oled CMAKE_OPTS="-DCONFIG_APP_NET_TYPE_WIFI=y"
+make build BOARD=esp32c3_042_oled
 ```
 
 Example: Using the esp32 matrix:
@@ -38,6 +71,10 @@ Build (supports qemu_x86_64):
 ```bash
 make build BOARD=qemu_x86_64 CMAKE_OPTS="-DCONFIG_APP_NET_TYPE_SERIAL=y"
 ```
+
+To make that the permanent choice for the board, put
+`CONFIG_APP_NET_TYPE_SERIAL=y` in `boards/qemu_x86_64.conf` instead and just run
+`make build BOARD=qemu_x86_64`.
 
 ### Setting up Serial Networking with QEMU
 
@@ -86,3 +123,22 @@ Then flash and debug:
 make flash
 make west ARGS=debug
 ```
+
+### W55RP20-EVB-Pico (SWD via Raspberry Pi Debug Probe)
+
+Unlike the ESP32 recipe above, nothing has to be baked into the build: the make
+flow hands west the right OpenOCD at flash/debug time, from
+`common/boards/wiznet/w55rp20_evb_pico/board.mk`.
+
+```
+make BOARD=w55rp20_evb_pico PRISTINE=y SNIPPET=debug build
+make flash          # over SWD; no BOOTSEL and no UF2 mount
+make debug          # gdb, stopped at main, with Zephyr thread awareness
+```
+
+One-time host setup (build Raspberry Pi's OpenOCD fork, install the udev rule),
+the wiring, and the board-specific gotchas are documented in
+`common/boards/wiznet/w55rp20_evb_pico/README.md`.
+
+The network type comes from `boards/w55rp20_evb_pico.conf`, so nothing extra is
+needed on the command line — see [Configuration](#configuration).

@@ -7,7 +7,7 @@
 #include "ProtoRpc.h"
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_DECLARE(app, LOG_LEVEL_DBG);
+LOG_MODULE_DECLARE(app, CONFIG_APP_LOG_LEVEL);
 
 #include "TestRpc.h"
 #include "TestRpc.pb.h"
