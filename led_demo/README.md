@@ -17,6 +17,7 @@ improvements on top of your local edits.
 | NV settings | no |
 | Shell | yes |
 | Onboard LED | yes |
+| Modules | `TcpServer`(wrn) |
 
 
 ## Building

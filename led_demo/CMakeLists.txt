@@ -60,6 +60,7 @@ target_sources(
     src/main.c
     src/led.c
     src/rpc.c
+    src/TcpServer.c
     )
 
 # Exactly one net_*.c provides app_net_init(). net_l4.c carries the bring-up

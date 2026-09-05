@@ -40,5 +40,6 @@ static inline int app_trace_init(void) { return 0; }
 /** @brief Configures the onboard LED. Safe to call on a board with no led0
     alias -- see led.h. */
 int app_led_init(void);
+int app_TcpServer_init(void);
 
 #endif /* APP_H */
