@@ -1,0 +1,6 @@
+/*
+ * Devicetree overlay for w55rp20_evb_pico.
+ */
+
+/* This board defines the led0 alias in its own devicetree, so
+ * the application does not need to. */

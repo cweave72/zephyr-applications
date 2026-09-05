@@ -1,0 +1,14 @@
+# Written by Copier from common/templates/app -- do not edit by hand.
+# Read by `app_gen update <app>` to re-apply template changes.
+_commit: app-template-v1
+_src_path: /home/cdweave/zephyr-workspace/common
+app_name: led_demo
+description: LED + eth RPC demo
+ip_mode: dhcp
+modules: {}
+net_type: eth
+use_led: true
+use_nv: false
+use_rpc: true
+use_shell: true
+use_tracing: false

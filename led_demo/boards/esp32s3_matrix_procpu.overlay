@@ -1,0 +1,18 @@
+/*
+ * Devicetree overlay for esp32s3_matrix_procpu.
+ */
+
+/* Onboard LED. Pin taken from applications/blinky. */
+/ {
+	leds {
+		compatible = "gpio-leds";
+		myled0: led_0 {
+			gpios = <&gpio0 1 GPIO_ACTIVE_HIGH>;
+			label = "Onboard LED 0";
+		};
+	};
+
+	aliases {
+		led0 = &myled0;
+	};
+};
