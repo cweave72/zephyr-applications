@@ -16,6 +16,7 @@ main(void)
     int ret;
 
     LOG_INF("led_demo starting.");
+    LOG_INF("MY LOCAL EDIT - must survive the update");
 
     /* Not fatal: a board without an led0 alias logs a warning and continues. */
     (void)app_led_init();
