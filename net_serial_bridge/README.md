@@ -67,6 +67,31 @@ while no host program has the port open.
 
 ## Bridge design
 
+```
+ Host                    w55rp20_evb_pico (net_serial_bridge)                   Serial port
+ ----                    ------------------------------------                   -----------
+
+ +----------+  TCP  +---------------+ SerialPipe_send() +---------------+          +-------------+
+ | minicom  |------>| TcpServer     |------------------>| SerialPipe TX |  uart_   | uart0       |
+ | nc       | 12001 | "TCP Bridge"  | <=256 B chunks,   | tx_fifo, 16   |  pipe_   | GP0 / GP1   |
+ | test     |<------| prio 10       | wait <=250 ms     | thread prio 8 |--------->|             |
+ +----------+       | poll 10 ms    |                   +---------------+  send()  |   -- or --  |
+                    | bridge_cb()   |                                              |             |
+                    +-------+-------+                   +---------------+  uart_   | cdc_acm_    |
+                            ^                           | SerialPipe RX |  pipe    | uart0       |
+                            | k_fifo s2t_fifo           | SwFifo 1 KB   |<---------|             |
+                            | 16 x 256 B items          | (8 KB cdc_acm)|  recv cb +-------------+
+                            | drop oldest when full     +-------+-------+
+                    +-------+-------+  SerialPipe_rxGet()       |
+                    | bridge_rx     |<--------------------------+
+                    | thread        |  fill 256 B items,
+                    | prio 9        |  flush after 2 ms idle
+                    | poll 2 ms     |
+                    +---------------+
+
+ TCP -> serial: top row, left to right.   Serial -> TCP: bottom row, right to left.
+```
+
 Two threads and one `k_fifo`:
 
 - `src/bridge_serial.c`: a thread polls `SerialPipe_rxGet()` every
