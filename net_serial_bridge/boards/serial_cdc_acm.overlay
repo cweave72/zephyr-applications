@@ -1,0 +1,13 @@
+/*
+ * Bridge the USB CDC-ACM port to TCP. The console and shell move to uart0
+ * (GP0/GP1) so they do not share the bridged port. Applied through
+ * EXTRA_DTC_OVERLAY_FILE when APP_SERIAL_SRC=cdc_acm.
+ */
+
+/ {
+	chosen {
+		zephyr,uart-pipe = &cdc_acm_uart0;
+		zephyr,console = &uart0;
+		zephyr,shell-uart = &uart0;
+	};
+};

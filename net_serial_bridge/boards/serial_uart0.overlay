@@ -1,0 +1,13 @@
+/*
+ * Bridge uart0 (GP0/GP1) to TCP. The console stays on USB CDC-ACM, the board
+ * default. Applied through EXTRA_DTC_OVERLAY_FILE when APP_SERIAL_SRC=uart0.
+ *
+ * Wiring (Raspberry Pi Debug Probe "U" connector): probe TX -> GP1 (UART0 RX),
+ * probe RX -> GP0 (UART0 TX), GND -> GND.
+ */
+
+/ {
+	chosen {
+		zephyr,uart-pipe = &uart0;
+	};
+};

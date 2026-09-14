@@ -1,0 +1,101 @@
+mainmenu "Remote a UART stream over TCP."
+
+menu "App Options"
+
+	choice APP_NET_TYPE
+		prompt "Network type"
+		default APP_NET_TYPE_ETH
+
+		config APP_NET_TYPE_WIFI
+		bool "wifi network"
+
+		config APP_NET_TYPE_SERIAL
+		bool "serial net"
+
+		config APP_NET_TYPE_ETH
+		bool "wired ethernet networking"
+
+		config APP_NET_TYPE_USB
+		bool "usb (CDC-ECM) networking"
+	endchoice
+
+	config APP_USE_STATIC_IP
+	    bool "Use a static IP address rather than DHCP."
+
+	config APP_IPV4_ADDR
+	    string "Static IPv4 address."
+	    default "192.168.1.15"
+
+	config APP_IPV4_MASK
+	    string "Static IPv4 netmask."
+	    default "255.255.255.0"
+
+	config APP_IPV4_GW
+	    string "Static IPv4 gateway."
+	    default "192.168.1.1"
+
+	# Mirrors the APP_SERIAL_SRC CMake variable, which also selects the
+	# devicetree overlay. CMakeLists.txt verifies the two agree.
+	choice APP_SERIAL_SRC
+		prompt "Serial port bridged to TCP"
+		default APP_SERIAL_SRC_UART0
+
+		config APP_SERIAL_SRC_UART0
+		bool "uart0 (GP0/GP1); console stays on USB CDC-ACM"
+
+		config APP_SERIAL_SRC_CDC_ACM
+		bool "USB CDC-ACM; console moves to uart0"
+	endchoice
+
+	menu "Serial bridge"
+
+		config APP_BRIDGE_TCP_PORT
+		    int "TCP port the bridge listens on."
+		    default 12001
+
+		config APP_BRIDGE_ITEM_SIZE
+		    int "Bytes per serial->TCP queue item."
+		    default 256
+		    range 16 4096
+
+		config APP_BRIDGE_POOL_DEPTH
+		    int "Number of serial->TCP queue items."
+		    default 16
+
+		config APP_BRIDGE_SERIAL_POLL_MS
+		    int "Serial receive poll period, ms. One empty poll flushes a partial item."
+		    default 2
+
+		config APP_BRIDGE_TCP_POLL_MS
+		    int "TcpServer receive poll timeout, ms. Sets the serial->TCP latency floor."
+		    default 10
+
+		config APP_BRIDGE_TX_WAIT_MS
+		    int "Max time to wait for SerialPipe transmit pool space, ms."
+		    default 250
+
+		config APP_BRIDGE_SERIAL_STACK_SIZE
+		    int "Stack size for the serial receive thread."
+		    default 1024
+
+		config APP_BRIDGE_SERIAL_THREAD_PRIO
+		    int "Priority for the serial receive thread."
+		    default 9
+
+		config APP_BRIDGE_TCP_STACK_SIZE
+		    int "Stack size for the bridge TcpServer thread."
+		    default 4096
+
+		config APP_BRIDGE_TCP_THREAD_PRIO
+		    int "Priority for the bridge TcpServer thread."
+		    default 10
+
+	endmenu
+
+endmenu
+
+source "Kconfig.zephyr"
+
+module = APP
+module-str = "app"
+source "subsys/logging/Kconfig.template.log_config"

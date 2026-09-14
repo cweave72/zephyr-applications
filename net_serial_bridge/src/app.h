@@ -1,0 +1,52 @@
+/*******************************************************************************
+ *  @file: app.h
+ *
+ *  @brief: Application-level init contract.
+ *
+ *  Each optional subsystem provides one app_*_init(). When a subsystem is not
+ *  built, a no-op inline stands in, so main.c carries no preprocessor logic and
+ *  reads identically in every generated app.
+ *
+ *  Networking is resolved at BUILD time, not generation time: the transport is
+ *  declared per board in boards/<board>.conf and resolved by
+ *  app_net_type_resolve(), so one app can be wifi on one board and eth on
+ *  another. That is why app_net_init() stays behind CONFIG_APP_NET_TYPE_*
+ *  rather than being generated in or out.
+*******************************************************************************/
+#ifndef APP_H
+#define APP_H
+
+/* Brings in app_led_init(), app_led_set() and app_led_toggle(). Included here
+   rather than re-declaring app_led_init, so led.h stays the single declaration
+   site for the LED API. */
+#include "led.h"
+
+/** @brief Brings the network up and blocks until it is usable.
+    Provided by exactly one of src/net_*.c -- see CMakeLists.txt. */
+#if defined(CONFIG_APP_NET_TYPE_WIFI) || defined(CONFIG_APP_NET_TYPE_SERIAL) \
+    || defined(CONFIG_APP_NET_TYPE_ETH) || defined(CONFIG_APP_NET_TYPE_USB)
+int app_net_init(void);
+#else
+static inline int app_net_init(void) { return 0; }
+#endif
+
+#if defined(CONFIG_TCPRPCSERVER)
+int app_rpc_init(void);
+#else
+static inline int app_rpc_init(void) { return 0; }
+#endif
+
+#if defined(CONFIG_TRACERAM)
+int app_trace_init(void);
+#else
+static inline int app_trace_init(void) { return 0; }
+#endif
+
+/** @brief Starts the serial <-> TCP bridge. Provided by src/bridge_tcp.c. */
+#if defined(CONFIG_SERIALPIPE) && defined(CONFIG_TCPSERVER)
+int app_bridge_init(void);
+#else
+static inline int app_bridge_init(void) { return 0; }
+#endif
+
+#endif /* APP_H */
