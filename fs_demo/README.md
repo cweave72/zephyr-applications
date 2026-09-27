@@ -8,16 +8,16 @@ improvements on top of your local edits.
 
 ## Configuration
 
-|             |                                                      |
-|-------------|------------------------------------------------------|
-| Networking  | `eth`                                                |
-| Addressing  | `static` — 192.168.1.15/255.255.255.0 gw 192.168.1.1 |
-| RPC server  | yes                                                  |
-| Tracing     | no                                                   |
-| NV settings | no                                                   |
-| Shell       | yes                                                  |
-| Onboard LED | yes                                                  |
-| File system | littlefs: `/flash` 128 KiB, `/ram` 32 KiB            |
+|             |                                                                               |
+|-------------|-------------------------------------------------------------------------------|
+| Networking  | `eth`                                                                         |
+| Addressing  | `static` — 192.168.1.15/255.255.255.0 gw 192.168.1.1; `net.conf` overrides it |
+| RPC server  | yes                                                                           |
+| Tracing     | no                                                                            |
+| NV settings | no                                                                            |
+| Shell       | yes                                                                           |
+| Onboard LED | yes                                                                           |
+| File system | littlefs: `/flash` 128 KiB, `/ram` 32 KiB                                     |
 
 
 ## Building
@@ -77,7 +77,9 @@ The app is the test application for the `FsApi` module
    disk. The RAM content is lost at reset, so each boot formats `/ram`.
 3. `src/fs.c` logs the volume statistics of each mount.
 4. `src/fs.c` increments the counter in `/flash/bootcount`.
-5. `src/rpc.c` registers the `FsApiRpc` callset as id 2. A host can then read,
+5. `src/net_ip.c` reads the IPv4 settings from
+   `/flash/etc/config/net.conf`. See [Network configuration](#network-configuration-netconf).
+6. `src/rpc.c` registers the `FsApiRpc` callset as id 2. A host can then read,
    write and format both file systems with `fsapi-cli`
    (`python/fsapi/README.md`).
 
@@ -93,6 +95,63 @@ The app has two mounts:
 
 Use `/flash` for data that must stay across a reset. Use `/ram` for scratch
 data. A write to `/ram` is fast and does not wear the flash.
+
+### Network configuration (`net.conf`)
+
+`src/net_ip.c` reads the `[ipv4]` section of `/flash/etc/config/net.conf` at
+boot (with the `IniFileParser` module). A missing file or key, or a value which is
+not an IPv4 address, uses the build-time value `CONFIG_APP_IPV4_ADDR`,
+`_MASK` or `_GW`. The log shows the source of each value.
+
+```
+# brand/default/etc/config/net.conf
+[ipv4]
+mode = static           # static | dhcp
+address = 192.168.1.16
+netmask = 255.255.255.0
+gateway = 192.168.1.1
+```
+
+| Key       | Values           | Fallback               |
+|-----------|------------------|------------------------|
+| `mode`    | `static`, `dhcp` | `static`               |
+| `address` | IPv4 address     | `CONFIG_APP_IPV4_ADDR` |
+| `netmask` | IPv4 netmask     | `CONFIG_APP_IPV4_MASK` |
+| `gateway` | IPv4 address     | `CONFIG_APP_IPV4_GW`   |
+
+`mode = dhcp` needs `CONFIG_NET_DHCPV4`. This build has no DHCP, so it logs a
+warning and uses the static address.
+
+The branded address (192.168.1.16) differs from the Kconfig address
+(192.168.1.15). Thus the address shows which source the device used.
+
+### Branding
+
+`make brand` writes the `brand/default` tree into `/flash`:
+
+```bash
+make BOARD=w55rp20_evb_pico build
+make BOARD=w55rp20_evb_pico brand       # flashes only the fs partition
+make BOARD=w55rp20_evb_pico reset
+ping 192.168.1.16
+```
+
+Branding replaces the whole `/flash` partition, so `bootcount` starts again.
+`make flash` does not touch the partition, so a firmware update keeps
+`net.conf`. To use another tree, for example one with secrets outside git:
+
+```bash
+make BOARD=w55rp20_evb_pico brand BRAND=~/site-a
+```
+
+To change the file on a running device without branding:
+
+```bash
+fsapi-cli --ip 192.168.1.16 put net.conf /flash/etc/config/net.conf
+make BOARD=w55rp20_evb_pico reset
+```
+
+See "Branding" in `common/modules/FsApi/README.md`.
 
 ### Flash layout
 
@@ -200,10 +259,10 @@ without a change to the four sizes in `FS_LITTLEFS_DECLARE_CUSTOM_CONFIG`.
 **Test.**
 
 ```bash
-fsapi-cli --ip 192.168.1.15 df /ram
-fsapi-cli --ip 192.168.1.15 put local.bin /ram/local.bin
-fsapi-cli --ip 192.168.1.15 tree /ram
-fsapi-cli --ip 192.168.1.15 format /ram
+fsapi-cli --ip <device-ip> df /ram
+fsapi-cli --ip <device-ip> put local.bin /ram/local.bin
+fsapi-cli --ip <device-ip> tree /ram
+fsapi-cli --ip <device-ip> format /ram
 ```
 
 A move from `/ram` to `/flash` fails with `EINVAL`. Copy the file with `get`
@@ -261,16 +320,18 @@ start this chip.
 From `python/.venv`:
 
 ```bash
-fsapi-cli --ip 192.168.1.15 --refresh-bindings
-fsapi-cli --ip 192.168.1.15 mounts
-fsapi-cli --ip 192.168.1.15 df
-fsapi-cli --ip 192.168.1.15 tree /flash
-fsapi-cli --ip 192.168.1.15 put local.bin /ram/local.bin
-fsapi-cli --ip 192.168.1.15 get /ram/local.bin copy.bin
-fsapi-cli --ip 192.168.1.15 format /ram
+fsapi-cli --ip <device-ip> --refresh-bindings
+fsapi-cli --ip <device-ip> mounts
+fsapi-cli --ip <device-ip> df
+fsapi-cli --ip <device-ip> tree /flash
+fsapi-cli --ip <device-ip> put local.bin /ram/local.bin
+fsapi-cli --ip <device-ip> get /ram/local.bin copy.bin
+fsapi-cli --ip <device-ip> format /ram
 ```
 
 The `--refresh-bindings` step makes sure that the host knows callset id 2.
+`<device-ip>` is 192.168.1.16 after `make brand`, and 192.168.1.15 without
+`net.conf`.
 
 ## LED
 
