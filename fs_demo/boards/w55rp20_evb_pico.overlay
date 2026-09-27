@@ -1,0 +1,66 @@
+/*
+ * Devicetree overlay for w55rp20_evb_pico.
+ */
+
+/* This board defines the led0 alias in its own devicetree, so
+ * the application does not need to. */
+
+/*
+ * Console on UART0 (GP0/GP1) instead of the board default USB CDC-ACM.
+ * The Raspberry Pi Debug Probe UART bridge keeps the port open across resets
+ * and shows the full boot log. Wiring:
+ *   probe U connector TX (orange) -> GP1  (UART0 RX)
+ *                     GND (black) -> GND
+ *                     RX  (yellow)-> GP0  (UART0 TX)
+ */
+/ {
+	chosen {
+		zephyr,console = &uart0;
+		zephyr,shell-uart = &uart0;
+	};
+};
+
+/*
+ * Flash split: code at the bottom, littlefs at the top.
+ *
+ * APP_LFS_SIZE sets the file system size. It must be a multiple of the 4 KiB
+ * erase block. Override it for one build without an edit:
+ *   make build CMAKE_OPTS="-DDTS_EXTRA_CPPFLAGS=-DAPP_LFS_SIZE=0x40000"
+ * An override that moves the partition makes dtc warn about the node unit
+ * address (unit_address_vs_reg). The warning is harmless.
+ */
+#ifndef APP_LFS_SIZE
+#define APP_LFS_SIZE	DT_SIZE_K(128)
+#endif
+#define APP_FLASH_SIZE	DT_SIZE_M(2)
+#define APP_LFS_OFFSET	(APP_FLASH_SIZE - APP_LFS_SIZE)
+
+&code_partition {
+	reg = <0x100 (APP_LFS_OFFSET - 0x100)>;
+};
+
+&flash0 {
+	partitions {
+		lfs_partition: partition@1e0000 {
+			label = "lfs";
+			reg = <APP_LFS_OFFSET APP_LFS_SIZE>;
+		};
+	};
+};
+
+/* The file system which FsApi mounts. FsApi finds it by the nodelabel. */
+/ {
+	fstab {
+		compatible = "zephyr,fstab";
+		fsapi_lfs: fsapi_lfs {
+			compatible = "zephyr,fstab,littlefs";
+			mount-point = "/lfs";
+			partition = <&lfs_partition>;
+			read-size = <16>;
+			prog-size = <16>;
+			cache-size = <256>;
+			lookahead-size = <32>;
+			block-cycles = <512>;
+		};
+	};
+};

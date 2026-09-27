@@ -1,0 +1,17 @@
+# Written by Copier from common/templates/app -- do not edit by hand.
+# Read by `app_gen update <app>` to re-apply template changes.
+_commit: app-template-v3-10-g67a5046
+_src_path: /home/cdweave/zephyr-workspace/common
+app_name: fs_demo
+description: FsApi littlefs demo with remote file access over RPC.
+ip_mode: static
+ipv4_addr: 192.168.1.15
+ipv4_gw: 192.168.1.1
+ipv4_mask: 255.255.255.0
+modules: {}
+net_type: eth
+use_led: true
+use_nv: false
+use_rpc: true
+use_shell: true
+use_tracing: false
