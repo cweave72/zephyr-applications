@@ -17,7 +17,7 @@ improvements on top of your local edits.
 | NV settings | no                                                   |
 | Shell       | yes                                                  |
 | Onboard LED | yes                                                  |
-| File system | littlefs at `/lfs`, 128 KiB                          |
+| File system | littlefs: `/flash` 128 KiB, `/ram` 32 KiB            |
 
 
 ## Building
@@ -71,16 +71,28 @@ Build the host-side protobuf bindings with `make proto`.
 The app is the test application for the `FsApi` module
 (`common/modules/FsApi/README.md`). It does these steps:
 
-1. `src/fs.c` calls `FsApi_init`. FsApi mounts littlefs at `/lfs`. The first
-   mount formats the partition.
-2. `src/fs.c` logs the volume statistics.
-3. `src/fs.c` increments the counter in `/lfs/bootcount`.
-4. `src/rpc.c` registers the `FsApiRpc` callset as id 2. A host can then read,
-   write and format the file system with `fsapi-cli`
+1. `src/fs.c` calls `FsApi_init`. FsApi mounts the flash partition at
+   `/flash` from the fstab node. The first mount formats the partition.
+2. `src/fs.c` calls `FsApi_addMount` for `/ram`: littlefs on a 32 KiB RAM
+   disk. The RAM content is lost at reset, so each boot formats `/ram`.
+3. `src/fs.c` logs the volume statistics of each mount.
+4. `src/fs.c` increments the counter in `/flash/bootcount`.
+5. `src/rpc.c` registers the `FsApiRpc` callset as id 2. A host can then read,
+   write and format both file systems with `fsapi-cli`
    (`python/fsapi/README.md`).
 
 A file system error does not stop the app. The RPC server starts without the
 file system.
+
+The app has two mounts:
+
+| Mount    | Storage                         | Size                        | Defined in                            | After a reset |
+|----------|---------------------------------|-----------------------------|---------------------------------------|---------------|
+| `/flash` | flash partition `lfs_partition` | 128 KiB: 32 blocks of 4 KiB | fstab node `flash_lfs` in the overlay | Data kept     |
+| `/ram`   | RAM disk `ramdisk0`             | 32 KiB: 64 blocks of 512 B  | `ram_mnt` in `src/fs.c`               | Data lost     |
+
+Use `/flash` for data that must stay across a reset. Use `/ram` for scratch
+data. A write to `/ram` is fast and does not wear the flash.
 
 ### Flash layout
 
@@ -91,8 +103,8 @@ file system.
 | `code_partition` | `0x100`      | to the fs partition      |
 | `lfs_partition`  | top of flash | `APP_LFS_SIZE` (128 KiB) |
 
-A code flash does not erase the fs partition. Files stay across flash and
-reset operations.
+A code flash does not erase the fs partition. Files on `/flash` stay across
+flash and reset operations.
 
 To change the fs size for one build, set `APP_LFS_SIZE` in bytes. The value
 must be a multiple of the 4 KiB erase block:
@@ -105,6 +117,98 @@ A size change moves the partition. dtc then warns about the node unit address
 (`unit_address_vs_reg`). The warning is harmless. If the code partition
 becomes too small for the image, the link fails.
 
+### RAM disk (`/ram`)
+
+Three parts make the `/ram` mount.
+
+1. **The disk.** The `ramdisk0` node in `boards/w55rp20_evb_pico.overlay`
+   gives a Zephyr RAM disk named `RAM`. The disk driver reserves a static
+   buffer of `sector-size` x `sector-count` bytes.
+
+   ```dts
+   / {
+   	ramdisk0: ramdisk0 {
+   		compatible = "zephyr,ram-disk";
+   		disk-name = "RAM";
+   		sector-size = <512>;
+   		sector-count = <64>;
+   	};
+   };
+   ```
+
+2. **The mount.** `src/fs.c` defines a littlefs configuration and a mount
+   descriptor. `storage_dev` is the disk name. `FS_MOUNT_FLAG_USE_DISK_ACCESS`
+   tells littlefs to use the disk access API, not the flash map.
+
+   ```c
+   FS_LITTLEFS_DECLARE_CUSTOM_CONFIG(ram_lfs, 4, 512, 512, 512, 2048);
+
+   static struct fs_mount_t ram_mnt = {
+       .type = FS_LITTLEFS,
+       .fs_data = &ram_lfs,
+       .storage_dev = (void *)"RAM",
+       .mnt_point = "/ram",
+       .flags = FS_MOUNT_FLAG_USE_DISK_ACCESS,
+   };
+   ```
+
+   `app_fs_init` calls `FsApi_addMount(&ram_mnt)` after `FsApi_init`.
+
+3. **The configuration.** `conf/fs.conf` enables `CONFIG_DISK_ACCESS`,
+   `CONFIG_DISK_DRIVER_RAM` and `CONFIG_FS_LITTLEFS_BLK_DEV`.
+
+A devicetree fstab node cannot describe this mount. In Zephyr 4.0 a littlefs
+fstab node always uses a flash partition. Thus the mount is in code.
+
+**littlefs parameters.** On a disk, littlefs uses one sector as one block.
+It then sets these values:
+
+| Parameter                       | Value  | Rule                                                                                                                                   |
+|---------------------------------|--------|----------------------------------------------------------------------------------------------------------------------------------------|
+| Block size                      | 512 B  | One disk sector.                                                                                                                       |
+| Read, prog and cache size       | 512 B  | One block. A smaller cache stops the mount (`-ENOMEM`).                                                                                |
+| Lookahead size                  | 2048 B | 4 blocks or more. A smaller value stops the mount (`-ENOMEM`).                                                                         |
+| `CONFIG_FS_LITTLEFS_CACHE_SIZE` | 512    | At least the cache size. With a smaller value the file cache heap holds fewer caches, and a later open on `/ram` fails with `-ENOMEM`. |
+
+The arguments of `FS_LITTLEFS_DECLARE_CUSTOM_CONFIG` are the buffer alignment,
+the read, prog and cache sizes, and the lookahead size. FsApi cannot check
+these values at build time, because the mount is in code. A wrong value shows
+only at run time, as a mount or open error.
+
+**Boot.** The RAM disk is empty after a reset. The mount then finds no file
+system, and littlefs formats the disk. Thus `/ram` is empty after each boot.
+`fsapi-cli format /ram` also empties it at run time.
+
+**RAM cost.** The `/ram` mount adds about 38 KiB of RAM:
+
+| Item                                           | Bytes |
+|------------------------------------------------|-------|
+| Disk buffer (64 x 512 B)                       | 32768 |
+| littlefs read and prog buffers                 | 1024  |
+| littlefs lookahead buffer                      | 2048  |
+| Larger file cache heap (cache size 256 to 512) | 1024  |
+
+The rest, about 1.7 KiB, is disk driver and littlefs state.
+
+The image uses 86 % of the 264 KiB RAM. It used 72 % without `/ram`.
+
+**Size change.** Change `sector-count` in the overlay. Each sector adds 512 B
+of RAM and one block. littlefs uses 2 blocks for the root directory. The
+other blocks hold files and directories. Do not change `sector-size`
+without a change to the four sizes in `FS_LITTLEFS_DECLARE_CUSTOM_CONFIG`.
+
+**Test.**
+
+```bash
+fsapi-cli --ip 192.168.1.15 df /ram
+fsapi-cli --ip 192.168.1.15 put local.bin /ram/local.bin
+fsapi-cli --ip 192.168.1.15 tree /ram
+fsapi-cli --ip 192.168.1.15 format /ram
+```
+
+A move from `/ram` to `/flash` fails with `EINVAL`. Copy the file with `get`
+and `put`.
+
 ### Configuration
 
 `conf/fs.conf` enables the file system:
@@ -116,12 +220,17 @@ becomes too small for the image, the link fails.
 | `CONFIG_FILE_SYSTEM`            | y     | The Zephyr VFS.                            |
 | `CONFIG_FILE_SYSTEM_LITTLEFS`   | y     | The littlefs file system.                  |
 | `CONFIG_FILE_SYSTEM_MKFS`       | y     | `FsApi` depends on it, for `FsApi_format`. |
-| `CONFIG_FS_LITTLEFS_CACHE_SIZE` | 256   | Must be >= `cache-size` in the fstab node. |
+| `CONFIG_DISK_ACCESS`            | y     | Disk access for the RAM disk.              |
+| `CONFIG_DISK_DRIVER_RAM`        | y     | The RAM disk driver.                       |
+| `CONFIG_FS_LITTLEFS_BLK_DEV`    | y     | littlefs on a disk (`/ram`).               |
+| `CONFIG_FS_LITTLEFS_CACHE_SIZE` | 512   | Must be >= the cache of each mount.        |
 | `CONFIG_FSAPI`                  | y     | The FsApi module.                          |
 | `CONFIG_FSAPIRPC`               | y     | The FsApiRpc callset.                      |
 
-FsApi stops the build if `CONFIG_FS_LITTLEFS_CACHE_SIZE` is too small.
-Without that check, the second open file fails with `-ENOMEM`.
+The cache of `/flash` is the fstab node `cache-size` (256). The cache of
+`/ram` is one disk sector (512). If `CONFIG_FS_LITTLEFS_CACHE_SIZE` is smaller
+than a cache, an open on that mount fails with `-ENOMEM`. FsApi stops the build
+for `/flash`. It cannot check `/ram`, because `src/fs.c` defines that mount.
 
 ### Console
 
@@ -136,7 +245,7 @@ Raspberry Pi Debug Probe UART:
 
 Open the probe UART at 115200 baud, for example `/dev/ttyACM0`. The shell
 answers there. Most boot log lines do not show on this console. Use
-`fsapi-cli cat /lfs/bootcount` to see that the boot ran.
+`fsapi-cli cat /flash/bootcount` to see that the boot ran.
 
 ### Flash and test
 
@@ -153,11 +262,12 @@ From `python/.venv`:
 
 ```bash
 fsapi-cli --ip 192.168.1.15 --refresh-bindings
+fsapi-cli --ip 192.168.1.15 mounts
 fsapi-cli --ip 192.168.1.15 df
-fsapi-cli --ip 192.168.1.15 tree /lfs
-fsapi-cli --ip 192.168.1.15 put local.bin /lfs/local.bin
-fsapi-cli --ip 192.168.1.15 get /lfs/local.bin copy.bin
-fsapi-cli --ip 192.168.1.15 format
+fsapi-cli --ip 192.168.1.15 tree /flash
+fsapi-cli --ip 192.168.1.15 put local.bin /ram/local.bin
+fsapi-cli --ip 192.168.1.15 get /ram/local.bin copy.bin
+fsapi-cli --ip 192.168.1.15 format /ram
 ```
 
 The `--refresh-bindings` step makes sure that the host knows callset id 2.

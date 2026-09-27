@@ -48,13 +48,13 @@
 	};
 };
 
-/* The file system which FsApi mounts. FsApi finds it by the nodelabel. */
+/* The flash file system. FsApi_init mounts every zephyr,fstab,littlefs node. */
 / {
 	fstab {
 		compatible = "zephyr,fstab";
-		fsapi_lfs: fsapi_lfs {
+		flash_lfs: flash_lfs {
 			compatible = "zephyr,fstab,littlefs";
-			mount-point = "/lfs";
+			mount-point = "/flash";
 			partition = <&lfs_partition>;
 			read-size = <16>;
 			prog-size = <16>;
@@ -62,5 +62,19 @@
 			lookahead-size = <32>;
 			block-cycles = <512>;
 		};
+	};
+};
+
+/*
+ * RAM disk for the /ram file system: 64 sectors of 512 B (32 KiB). Its
+ * content is lost at reset, so each boot formats it again. A littlefs fstab
+ * node cannot describe a disk, thus src/fs.c defines the mount.
+ */
+/ {
+	ramdisk0: ramdisk0 {
+		compatible = "zephyr,ram-disk";
+		disk-name = "RAM";
+		sector-size = <512>;
+		sector-count = <64>;
 	};
 };
