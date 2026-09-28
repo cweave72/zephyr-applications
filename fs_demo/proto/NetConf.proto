@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+import 'nanopb.proto';
+
+// Network configuration. Branding writes it to /flash/etc/config/net.pb from
+// brand/<name>/etc/config/net.pb.yaml. The app reads it at boot. An empty
+// field uses the build-time Kconfig value.
+package netconf;
+
+enum Ipv4Mode {
+    IPV4_MODE_STATIC = 0;
+    IPV4_MODE_DHCP = 1;
+}
+
+message Ipv4 {
+    Ipv4Mode mode = 1;
+    // Dotted-quad text, for example "192.168.1.16". 16 B holds
+    // "255.255.255.255" and the NUL.
+    string address = 2 [(nanopb).max_size = 16];
+    string netmask = 3 [(nanopb).max_size = 16];
+    string gateway = 4 [(nanopb).max_size = 16];
+}
+
+message NetConf {
+    Ipv4 ipv4 = 1;
+}

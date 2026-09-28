@@ -1,0 +1,10 @@
+# Network configuration. fsapi-brand writes it to /flash/etc/config/net.pb.
+# The app reads the file at boot. An empty field uses the Kconfig value.
+proto: NetConf
+message: NetConf
+data:
+  ipv4:
+    mode: IPV4_MODE_STATIC      # IPV4_MODE_STATIC | IPV4_MODE_DHCP
+    address: 192.168.1.16
+    netmask: 255.255.255.0
+    gateway: 192.168.1.1

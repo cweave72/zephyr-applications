@@ -11,7 +11,7 @@ improvements on top of your local edits.
 |             |                                                                               |
 |-------------|-------------------------------------------------------------------------------|
 | Networking  | `eth`                                                                         |
-| Addressing  | `static` — 192.168.1.15/255.255.255.0 gw 192.168.1.1; `net.conf` overrides it |
+| Addressing  | `static` — 192.168.1.15/255.255.255.0 gw 192.168.1.1; `net.pb` overrides it   |
 | RPC server  | yes                                                                           |
 | Tracing     | no                                                                            |
 | NV settings | no                                                                            |
@@ -78,7 +78,7 @@ The app is the test application for the `FsApi` module
 3. `src/fs.c` logs the volume statistics of each mount.
 4. `src/fs.c` increments the counter in `/flash/bootcount`.
 5. `src/net_ip.c` reads the IPv4 settings from
-   `/flash/etc/config/net.conf`. See [Network configuration](#network-configuration-netconf).
+   `/flash/etc/config/net.pb`. See [Network configuration](#network-configuration-netpb).
 6. `src/rpc.c` registers the `FsApiRpc` callset as id 2. A host can then read,
    write and format both file systems with `fsapi-cli`
    (`python/fsapi/README.md`).
@@ -96,30 +96,39 @@ The app has two mounts:
 Use `/flash` for data that must stay across a reset. Use `/ram` for scratch
 data. A write to `/ram` is fast and does not wear the flash.
 
-### Network configuration (`net.conf`)
+### Network configuration (`net.pb`)
 
-`src/net_ip.c` reads the `[ipv4]` section of `/flash/etc/config/net.conf` at
-boot (with the `IniFileParser` module). A missing file or key, or a value which is
-not an IPv4 address, uses the build-time value `CONFIG_APP_IPV4_ADDR`,
-`_MASK` or `_GW`. The log shows the source of each value.
+`/flash/etc/config/net.pb` is a protobuf blob of the message
+`netconf.NetConf` (`proto/NetConf.proto`). `src/net_ip.c` reads it at boot
+with `FsApi_unpack_file`. A missing file, a bad file, an empty field, or a
+value which is not an IPv4 address uses the build-time value
+`CONFIG_APP_IPV4_ADDR`, `_MASK` or `_GW`. The log shows the source of each
+value (`net.pb` or `Kconfig`).
 
+Branding writes the blob from `brand/default/etc/config/net.pb.yaml`:
+
+```yaml
+proto: NetConf
+message: NetConf
+data:
+  ipv4:
+    mode: IPV4_MODE_STATIC      # IPV4_MODE_STATIC | IPV4_MODE_DHCP
+    address: 192.168.1.16
+    netmask: 255.255.255.0
+    gateway: 192.168.1.1
 ```
-# brand/default/etc/config/net.conf
-[ipv4]
-mode = static           # static | dhcp
-address = 192.168.1.16
-netmask = 255.255.255.0
-gateway = 192.168.1.1
-```
 
-| Key       | Values           | Fallback               |
-|-----------|------------------|------------------------|
-| `mode`    | `static`, `dhcp` | `static`               |
-| `address` | IPv4 address     | `CONFIG_APP_IPV4_ADDR` |
-| `netmask` | IPv4 netmask     | `CONFIG_APP_IPV4_MASK` |
-| `gateway` | IPv4 address     | `CONFIG_APP_IPV4_GW`   |
+`fsapi-brand` checks the data against `NetConf.proto`: field names, enum
+value names, and the 16 B `max_size` of each address string.
 
-`mode = dhcp` needs `CONFIG_NET_DHCPV4`. This build has no DHCP, so it logs a
+| Field     | Values                               | Fallback               |
+|-----------|--------------------------------------|------------------------|
+| `mode`    | `IPV4_MODE_STATIC`, `IPV4_MODE_DHCP` | `IPV4_MODE_STATIC`     |
+| `address` | IPv4 address                         | `CONFIG_APP_IPV4_ADDR` |
+| `netmask` | IPv4 netmask                         | `CONFIG_APP_IPV4_MASK` |
+| `gateway` | IPv4 address                         | `CONFIG_APP_IPV4_GW`   |
+
+`mode: IPV4_MODE_DHCP` needs `CONFIG_NET_DHCPV4`. This build has no DHCP, so it logs a
 warning and uses the static address.
 
 The branded address (192.168.1.16) differs from the Kconfig address
@@ -138,16 +147,20 @@ ping 192.168.1.16
 
 Branding replaces the whole `/flash` partition, so `bootcount` starts again.
 `make flash` does not touch the partition, so a firmware update keeps
-`net.conf`. To use another tree, for example one with secrets outside git:
+`net.pb`. To use another tree, for example one with secrets outside git:
 
 ```bash
 make BOARD=w55rp20_evb_pico brand BRAND=~/site-a
 ```
 
-To change the file on a running device without branding:
+To change the blob on a running device without branding:
 
 ```bash
-fsapi-cli --ip 192.168.1.16 put net.conf /flash/etc/config/net.conf
+fsapi-cli --ip 192.168.1.16 pbget /flash/etc/config/net.pb \
+    --proto NetConf --message NetConf --proto-path proto -o net.pb.yaml
+# Edit net.pb.yaml, for example address: 192.168.1.17.
+fsapi-cli --ip 192.168.1.16 pbput net.pb.yaml /flash/etc/config/net.pb \
+    --proto-path proto
 make BOARD=w55rp20_evb_pico reset
 ```
 
@@ -331,7 +344,7 @@ fsapi-cli --ip <device-ip> format /ram
 
 The `--refresh-bindings` step makes sure that the host knows callset id 2.
 `<device-ip>` is 192.168.1.16 after `make brand`, and 192.168.1.15 without
-`net.conf`.
+`net.pb`.
 
 ## LED
 
