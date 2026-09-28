@@ -99,7 +99,7 @@ data. A write to `/ram` is fast and does not wear the flash.
 ### Network configuration (`net.pb`)
 
 `/flash/etc/config/net.pb` is a protobuf blob of the message
-`netconf.NetConf` (`proto/NetConf.proto`). `src/net_ip.c` reads it at boot
+`netconf.NetConf` (`proto/NetConf/NetConf.proto` in the workspace). `src/net_ip.c` reads it at boot
 with `FsApi_unpack_file`. A missing file, a bad file, an empty field, or a
 value which is not an IPv4 address uses the build-time value
 `CONFIG_APP_IPV4_ADDR`, `_MASK` or `_GW`. The log shows the source of each
@@ -157,10 +157,9 @@ To change the blob on a running device without branding:
 
 ```bash
 fsapi-cli --ip 192.168.1.16 pbget /flash/etc/config/net.pb \
-    --proto NetConf --message NetConf --proto-path proto -o net.pb.yaml
+    --proto NetConf --message NetConf -o net.pb.yaml
 # Edit net.pb.yaml, for example address: 192.168.1.17.
-fsapi-cli --ip 192.168.1.16 pbput net.pb.yaml /flash/etc/config/net.pb \
-    --proto-path proto
+fsapi-cli --ip 192.168.1.16 pbput net.pb.yaml /flash/etc/config/net.pb
 make BOARD=w55rp20_evb_pico reset
 ```
 

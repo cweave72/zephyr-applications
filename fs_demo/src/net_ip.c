@@ -4,7 +4,7 @@
  *  @brief: IPv4 addressing. See net_ip.h.
  *
  *  The values come from /flash/etc/config/net.pb, a netconf.NetConf protobuf
- *  blob (proto/NetConf.proto). Branding writes it from
+ *  blob (proto/NetConf/NetConf.proto in the workspace). Branding writes it from
  *  brand/<name>/etc/config/net.pb.yaml; fsapi-cli pbput replaces it. A missing
  *  file or empty field falls back to the build-time value:
  *  CONFIG_APP_IPV4_ADDR, _MASK and _GW.

@@ -53,10 +53,7 @@ set(target app)
 include($ENV{WORKSPACE_BASE}/common/scripts/cmake/build_proto.cmake)
 
 # The following creates the target ${target}_proto.
-nanopb_build_sources(${target}
-    $ENV{WORKSPACE_BASE}/proto
-    ${CMAKE_CURRENT_SOURCE_DIR}/proto
-    )
+nanopb_build_sources(${target} $ENV{WORKSPACE_BASE}/proto)
 
 target_sources(
     ${target}
